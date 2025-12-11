@@ -15,7 +15,7 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
 
 // Routes
 app.get("/api/health", (req, res) => {
@@ -27,7 +27,7 @@ app.get("/api/books", (req, res) => {
 });
 
 // Production static file serving
-if (env.NODE_ENV === "production") {
+if (env.NODE_ENV === "development") {
     app.use(express.static(path.join(__dirname, "../frontend/dist")));
     app.get("*", (req, res) => {
         res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
