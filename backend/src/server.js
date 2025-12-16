@@ -15,10 +15,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // Middleware
+// Routes imports
+// Routes imports
+import sessionRoutes from "./routes/sessionRoute.js";
+import { inngestApi } from "./routes/inngestRoute.js";
+import chatRoutes from "./routes/chatRoute.js";
+
 app.use(express.json());
-app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+const allowedOrigin = env.CLIENT_URL || process.env.CLIENT_URL || "http://localhost:5173";
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 
 // Routes
+app.use("/api/sessions", sessionRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/inngest", inngestApi);
 app.get("/api/health", (req, res) => {
     res.status(200).json({ msg: "Server is healthy", status: "success" });
 });
@@ -30,7 +40,7 @@ app.get("/api/books", (req, res) => {
 // Production static file serving
 if (env.NODE_ENV === "production") {
     app.use(express.static(path.join(__dirname, "../frontend/dist")));
-    app.get("/*", (req, res) => {
+    app.get(/(.*)/, (req, res) => {
         res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
     });
 }
@@ -38,5 +48,6 @@ if (env.NODE_ENV === "production") {
 // Start server and connect to database
 app.listen(env.PORT, () => {
     console.log(`Server is running on port ${env.PORT}`);
+    console.log(`CORS Policy: Allowing origin ${allowedOrigin}`);
     connectDB();
 });

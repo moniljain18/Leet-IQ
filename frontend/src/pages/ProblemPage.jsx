@@ -86,23 +86,38 @@ function ProblemPage() {
     setOutput(null);
 
     const result = await executeCode(selectedLanguage, code);
+
+    // Check constraints if execution was successful
+    if (result.success) {
+      // NOTE: result.runtime now includes network latency as Piston API doesn't return execution time
+      if (result.runtime > currentProblem.timeLimit * 2) { // Relaxed time limit (2x) to account for network latency
+        result.success = false;
+        result.error = `Time Limit Exceeded! (Total time: ${result.runtime}ms, Limit: ${currentProblem.timeLimit}ms)`;
+      } else if (result.memory && result.memory / 1024 / 1024 > currentProblem.memoryLimit) {
+        result.success = false;
+        const memoryMB = (result.memory / 1024 / 1024).toFixed(2);
+        result.error = `Memory Limit Exceeded! Your code used ${memoryMB}MB (Limit: ${currentProblem.memoryLimit}MB)`;
+      }
+    }
+
     setOutput(result);
     setIsRunning(false);
 
     // check if code executed successfully and matches expected output
-
     if (result.success) {
       const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
       const testsPassed = checkIfTestsPassed(result.output, expectedOutput);
 
+      const memoryMB = result.memory ? (result.memory / 1024 / 1024).toFixed(2) : "N/A";
+
       if (testsPassed) {
         triggerConfetti();
-        toast.success("All tests passed! Great job!");
+        toast.success(`Success! Runtime: ${result.runtime}ms, Memory: ${memoryMB}MB`);
       } else {
         toast.error("Tests failed. Check your output!");
       }
     } else {
-      toast.error("Code execution failed!");
+      toast.error(result.error || "Code execution failed!");
     }
   };
 

@@ -1,41 +1,91 @@
-import { useUser } from '@clerk/clerk-react';
-import { StreamVideoClient } from '@stream-io/video-react-sdk';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from "react";
+import { StreamChat } from "stream-chat";
+import toast from "react-hot-toast";
+import { initializeStreamClient, disconnectStreamClient } from "../lib/stream";
+import { sessionApi } from "../api/sessions";
 
-const API_KEY = import.meta.env.VITE_STREAM_API_KEY || 'demo-api-key';
-
-const useStreamClient = () => {
-    const { user } = useUser();
-    const [client, setClient] = useState(null);
+function useStreamClient(session, loadingSession, isHost, isParticipant) {
+    const [streamClient, setStreamClient] = useState(null);
+    const [call, setCall] = useState(null);
+    const [chatClient, setChatClient] = useState(null);
+    const [channel, setChannel] = useState(null);
+    const [isInitializingCall, setIsInitializingCall] = useState(true);
 
     useEffect(() => {
-        if (!user) return;
+        let videoCall = null;
+        let chatClientInstance = null;
 
-        const userId = user.id;
-        const userName = user.fullName || user.username || 'Anonymous';
+        const initCall = async () => {
+            if (!session?.callId) return;
+            if (!isHost && !isParticipant) return;
+            if (session.status === "completed") return;
 
-        // Create Stream client
-        const streamClient = new StreamVideoClient({
-            apiKey: API_KEY,
-            user: {
-                id: userId,
-                name: userName,
-                image: user.imageUrl,
-            },
-            // For demo purposes, using a simple token
-            // In production, get this from your backend
-            token: 'demo-token',
-        });
+            try {
+                const { token, userId, userName, userImage } = await sessionApi.getStreamToken();
 
-        setClient(streamClient);
+                const client = await initializeStreamClient(
+                    {
+                        id: userId,
+                        name: userName,
+                        image: userImage,
+                    },
+                    token
+                );
 
-        return () => {
-            streamClient?.disconnectUser();
-            setClient(null);
+                setStreamClient(client);
+
+                videoCall = client.call("default", session.callId);
+                await videoCall.join({ create: true });
+                setCall(videoCall);
+
+                const apiKey = import.meta.env.VITE_STREAM_API_KEY;
+                chatClientInstance = StreamChat.getInstance(apiKey);
+
+                await chatClientInstance.connectUser(
+                    {
+                        id: userId,
+                        name: userName,
+                        image: userImage,
+                    },
+                    token
+                );
+                setChatClient(chatClientInstance);
+
+                const chatChannel = chatClientInstance.channel("messaging", session.callId);
+                await chatChannel.watch();
+                setChannel(chatChannel);
+            } catch (error) {
+                toast.error("Failed to join video call");
+                console.error("Error init call", error);
+            } finally {
+                setIsInitializingCall(false);
+            }
         };
-    }, [user]);
 
-    return client;
-};
+        if (session && !loadingSession) initCall();
+
+        // cleanup - performance reasons
+        return () => {
+            // iife
+            (async () => {
+                try {
+                    if (videoCall) await videoCall.leave();
+                    if (chatClientInstance) await chatClientInstance.disconnectUser();
+                    await disconnectStreamClient();
+                } catch (error) {
+                    console.error("Cleanup error:", error);
+                }
+            })();
+        };
+    }, [session, loadingSession, isHost, isParticipant]);
+
+    return {
+        streamClient,
+        call,
+        chatClient,
+        channel,
+        isInitializingCall,
+    };
+}
 
 export default useStreamClient;

@@ -24,6 +24,7 @@ export async function executeCode(language, code) {
             };
         }
 
+        const startTime = Date.now();
         const response = await fetch(`${PISTON_API}/execute`, {
             method: "POST",
             headers: {
@@ -40,6 +41,8 @@ export async function executeCode(language, code) {
                 ],
             }),
         });
+        const endTime = Date.now();
+        const runtime = endTime - startTime; // Client-side measured duration
 
         if (!response.ok) {
             return {
@@ -49,21 +52,43 @@ export async function executeCode(language, code) {
         }
 
         const data = await response.json();
+        console.log("Piston API Response:", data); // Debug logging
+
+        // Check for compilation errors (e.g., Syntax Errors in Java/C++)
+        if (data.compile && data.compile.stderr) {
+            return {
+                success: false,
+                output: "",
+                error: `Compilation Error:\n${data.compile.stderr}`,
+            };
+        }
+
+        // Check if runtime execution happened
+        if (!data.run) {
+            return {
+                success: false,
+                output: "",
+                error: "Execution failed: No run data received from Piston API",
+            };
+        }
 
         const output = data.run.output || "";
         const stderr = data.run.stderr || "";
 
+        // If stderr exists during run, return failure
         if (stderr) {
             return {
                 success: false,
                 output: output,
-                error: stderr,
+                error: `Runtime Error:\n${stderr}`,
             };
         }
 
         return {
             success: true,
-            output: output || "No output",
+            output: output.trim() || "No output",
+            runtime: runtime, // Client-side measured
+            memory: null,     // Not available from API
         };
     } catch (error) {
         return {

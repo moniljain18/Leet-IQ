@@ -2,6 +2,10 @@ import { chatClient } from "../lib/stream.js";
 
 export async function getStreamToken(req, res) {
   try {
+    if (!chatClient) {
+      return res.status(503).json({ message: "Stream chat is not configured" });
+    }
+
     // use clerkId for Stream (not mongodb _id)=> it should match the id we have in the stream dashboard
     const token = chatClient.createToken(req.user.clerkId);
 

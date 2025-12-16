@@ -21,7 +21,7 @@ function App() {
         <Route path="/dashboard" element={isDevelopment || isSignedIn ? <DashboardPage /> : <Navigate to={"/"} />} />
         <Route path="/problems" element={isDevelopment || isSignedIn ? <ProblemsPage /> : <Navigate to={"/"} />} />
         <Route path="/problem/:id" element={isDevelopment || isSignedIn ? <ProblemPage /> : <Navigate to={"/"} />} />
-        <Route path="/session/:id" element={isDevelopment || isSignedIn ? <SessionPage /> : <Navigate to={"/"} />} />
+        <Route path="/session" element={isDevelopment || isSignedIn ? <SessionPage /> : <Navigate to={"/"} />} />
       </Routes>
 
       <Toaster toastOptions={{ duration: 3000 }} />

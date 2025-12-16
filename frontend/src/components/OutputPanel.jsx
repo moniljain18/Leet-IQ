@@ -8,7 +8,17 @@ function OutputPanel({ output }) {
         {output === null ? (
           <p className="text-base-content/50 text-sm">Click "Run Code" to see the output here...</p>
         ) : output.success ? (
-          <pre className="text-sm font-mono text-success whitespace-pre-wrap">{output.output}</pre>
+          <div>
+            <pre className="text-sm font-mono text-success whitespace-pre-wrap">{output.output}</pre>
+            {output.runtime !== undefined && (
+              <div className="mt-4 pt-4 border-t border-base-300 text-xs text-base-content/60 font-mono">
+                <p>Runtime: <span className="text-base-content/90 font-semibold">{output.runtime}ms</span> (Total latency)</p>
+                {output.memory !== null && (
+                  <p>Memory: <span className="text-base-content/90 font-semibold">{(output.memory / 1024 / 1024).toFixed(2)} MB</span></p>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
           <div>
             {output.output && (

@@ -32,10 +32,12 @@ export const PROBLEMS = {
             "-10⁹ ≤ target ≤ 10⁹",
             "Only one valid answer exists",
         ],
+        timeLimit: 2000,
+        memoryLimit: 128,
         starterCode: {
             javascript: `function twoSum(nums, target) {
   // Write your solution here
-  
+  return [0, 0];
 }
 
 // Test cases
@@ -93,6 +95,8 @@ class Solution {
             },
         ],
         constraints: ["1 ≤ s.length ≤ 10⁵", "s[i] is a printable ascii character"],
+        timeLimit: 2000,
+        memoryLimit: 128,
         starterCode: {
             javascript: `function reverseString(s) {
   // Write your solution here
@@ -173,6 +177,8 @@ class Solution {
             },
         ],
         constraints: ["1 ≤ s.length ≤ 2 * 10⁵", "s consists only of printable ASCII characters"],
+        timeLimit: 2000,
+        memoryLimit: 128,
         starterCode: {
             javascript: `function isPalindrome(s) {
   // Write your solution here
@@ -239,6 +245,8 @@ print(isPalindrome(" "))  # Expected: True`,
             },
         ],
         constraints: ["1 ≤ nums.length ≤ 10⁵", "-10⁴ ≤ nums[i] ≤ 10⁴"],
+        timeLimit: 2000,
+        memoryLimit: 128,
         starterCode: {
             javascript: `function maxSubArray(nums) {
   // Write your solution here
@@ -304,6 +312,8 @@ print(maxSubArray([5,4,-1,7,8]))  # Expected: 23`,
             },
         ],
         constraints: ["n == height.length", "2 ≤ n ≤ 10⁵", "0 ≤ height[i] ≤ 10⁴"],
+        timeLimit: 2000,
+        memoryLimit: 128,
         starterCode: {
             javascript: `function maxArea(height) {
   // Write your solution here

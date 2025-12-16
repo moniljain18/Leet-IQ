@@ -11,6 +11,12 @@ export async function createSession(req, res) {
       return res.status(400).json({ message: "Problem and difficulty are required" });
     }
 
+    if (!streamClient || !chatClient) {
+      return res
+        .status(503)
+        .json({ message: "Stream credentials are missing. Please configure STREAM_API_KEY and STREAM_SECRET_KEY." });
+    }
+
     // generate a unique call id for stream video
     const callId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
@@ -36,8 +42,8 @@ export async function createSession(req, res) {
 
     res.status(201).json({ session });
   } catch (error) {
-    console.log("Error in createSession controller:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error in createSession controller:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 }
 
