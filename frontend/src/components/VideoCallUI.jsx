@@ -5,9 +5,10 @@ import {
   useCallStateHooks,
 } from "@stream-io/video-react-sdk";
 import { Loader2Icon, MessageSquareIcon, UsersIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Channel, Chat, MessageInput, MessageList, Thread, Window } from "stream-chat-react";
+import useFaceProctoring from "../hooks/useFaceProctoring";
 
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import "stream-chat-react/dist/css/v2/index.css";
@@ -18,6 +19,13 @@ function VideoCallUI({ chatClient, channel }) {
   const callingState = useCallCallingState();
   const participantCount = useParticipantCount();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  
+  const videoContainerRef = useRef(null);
+
+  useFaceProctoring({
+    enabled: callingState === CallingState.JOINED,
+    rootRef: videoContainerRef,
+  });
 
   if (callingState === CallingState.JOINING) {
     return (
@@ -31,7 +39,7 @@ function VideoCallUI({ chatClient, channel }) {
   }
 
   return (
-    <div className="h-full flex gap-3 relative str-video">
+    <div ref={videoContainerRef} className="h-full flex gap-3 relative str-video">
       <div className="flex-1 flex flex-col gap-3">
         {/* Participants count badge and Chat Toggle */}
         <div className="flex items-center justify-between gap-2 bg-base-100 p-3 rounded-lg shadow">

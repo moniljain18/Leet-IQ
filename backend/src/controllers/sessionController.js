@@ -123,23 +123,50 @@ export async function joinSession(req, res) {
       return res.status(400).json({ message: "Cannot join a completed session" });
     }
 
+    // Check if user is the host
     if (session.host.toString() === userId.toString()) {
-      return res.status(400).json({ message: "Host cannot join their own session as participant" });
+      // Host is already in the session, just return populated session
+      const populatedSession = await Session.findById(id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+      return res.status(200).json({ session: populatedSession });
     }
 
-    // check if session is already full - has a participant
+    // Check if user is already the participant
+    if (session.participant && session.participant.toString() === userId.toString()) {
+      // User is already participant, just return populated session
+      const populatedSession = await Session.findById(id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+      return res.status(200).json({ session: populatedSession });
+    }
+
+    // check if session is already full - has a different participant
     if (session.participant) return res.status(409).json({ message: "Session is full" });
 
+    // Add user as participant
     session.participant = userId;
     await session.save();
 
-    const channel = chatClient.channel("messaging", session.callId);
-    await channel.addMembers([clerkId]);
+    // Add user to Stream chat channel
+    try {
+      const channel = chatClient.channel("messaging", session.callId);
+      await channel.addMembers([clerkId]);
+    } catch (streamError) {
+      console.error("Stream chat error (non-critical):", streamError.message);
+      // Continue even if Stream fails - session is already saved
+    }
 
-    res.status(200).json({ session });
+    // Return populated session
+    const populatedSession = await Session.findById(id)
+      .populate("host", "name email profileImage clerkId")
+      .populate("participant", "name email profileImage clerkId");
+
+    res.status(200).json({ session: populatedSession });
   } catch (error) {
     console.log("Error in joinSession controller:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error", details: error.message });
   }
 }
 

@@ -17,6 +17,9 @@ export const useActiveSessions = () => {
     const result = useQuery({
         queryKey: ["activeSessions"],
         queryFn: sessionApi.getActiveSessions,
+        refetchInterval: 3000, // Poll every 3 seconds
+        refetchOnWindowFocus: true, // Refetch when user returns to tab
+        staleTime: 0, // Always consider data stale
     });
 
     return result;
