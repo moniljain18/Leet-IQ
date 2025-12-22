@@ -21,6 +21,8 @@ import sessionRoutes from "./routes/sessionRoute.js";
 
 import chatRoutes from "./routes/chatRoute.js";
 import executorRoutes from "./routes/executorRoute.js";
+import contestRoutes from "./routes/contestRoute.js";
+import userRoutes from "./routes/userRoute.js";
 
 app.use(express.json());
 const allowedOrigin = env.CLIENT_URL || process.env.CLIENT_URL || "http://localhost:5173";
@@ -30,6 +32,8 @@ app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/execute", executorRoutes);
+app.use("/api/contests", contestRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/api/health", (req, res) => {
     res.status(200).json({ msg: "Server is healthy", status: "success" });

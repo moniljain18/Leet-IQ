@@ -8,6 +8,7 @@ import ProblemDescription from "../components/ProblemDescription";
 import OutputPanel from "../components/OutputPanel";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import { executeCode } from "../api/executor";
+import axiosInstance from "../lib/axios";
 
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
@@ -21,8 +22,13 @@ function ProblemPage() {
   const [code, setCode] = useState(PROBLEMS[currentProblemId].starterCode.javascript);
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSolved, setIsSolved] = useState(false);
+  const [submissions, setSubmissions] = useState([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
+  const [contestData, setContestData] = useState(null);
 
   const currentProblem = PROBLEMS[currentProblemId];
+  const contestId = new URLSearchParams(window.location.search).get("contestId");
 
   // update problem when URL param changes
   useEffect(() => {
@@ -30,8 +36,38 @@ function ProblemPage() {
       setCurrentProblemId(id);
       setCode(PROBLEMS[id].starterCode[selectedLanguage]);
       setOutput(null);
+      fetchSubmissions(id);
     }
-  }, [id, selectedLanguage]);
+  }, [id, selectedLanguage, contestId]);
+
+  useEffect(() => {
+    if (contestId) {
+      fetchContestData();
+    }
+  }, [contestId]);
+
+  const fetchSubmissions = async (problemId) => {
+    setIsLoadingSubmissions(true);
+    const targetContestId = contestId || "practice";
+    try {
+      const response = await axiosInstance.get(`/contests/${targetContestId}/submissions?problemId=${problemId}`);
+      setSubmissions(response.data);
+      setIsSolved(response.data.some(s => s.status === "Accepted"));
+    } catch (e) {
+      console.error("Failed to fetch submissions:", e);
+    } finally {
+      setIsLoadingSubmissions(false);
+    }
+  };
+
+  const fetchContestData = async () => {
+    try {
+      const response = await axiosInstance.get(`/contests/${contestId}`);
+      setContestData(response.data);
+    } catch (e) {
+      console.error("Failed to fetch contest metadata:", e);
+    }
+  };
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
@@ -40,7 +76,10 @@ function ProblemPage() {
     setOutput(null);
   };
 
-  const handleProblemChange = (newProblemId) => navigate(`/problem/${newProblemId}`);
+  const handleProblemChange = (newProblemId) => {
+    const contestId = new URLSearchParams(window.location.search).get("contestId");
+    navigate(`/problem/${newProblemId}${contestId ? `?contestId=${contestId}` : ""}`);
+  };
 
   const triggerConfetti = () => {
     confetti({
@@ -57,18 +96,14 @@ function ProblemPage() {
   };
 
   const normalizeOutput = (output) => {
-    // normalize output for comparison (trim whitespace, handle different spacing)
     return output
       .trim()
       .split("\n")
       .map((line) =>
         line
           .trim()
-          // remove spaces after [ and before ]
-          .replace(/\[\s+/g, "[")
-          .replace(/\s+\]/g, "]")
-          // normalize spaces around commas to single space after comma
-          .replace(/\s*,\s*/g, ",")
+          .replace(/'/g, '"') // Normalize single to double quotes
+          .replace(/\s+/g, "") // Remove ALL whitespace for strict content matching
       )
       .filter((line) => line.length > 0)
       .join("\n");
@@ -89,8 +124,7 @@ function ProblemPage() {
 
     // Check constraints if execution was successful
     if (result.success) {
-      // NOTE: result.runtime now includes network latency as Piston API doesn't return execution time
-      if (result.runtime > currentProblem.timeLimit * 2) { // Relaxed time limit (2x) to account for network latency
+      if (result.runtime > currentProblem.timeLimit * 2) {
         result.success = false;
         result.error = `Time Limit Exceeded! (Total time: ${result.runtime}ms, Limit: ${currentProblem.timeLimit}ms)`;
       } else if (result.memory && result.memory / 1024 / 1024 > currentProblem.memoryLimit) {
@@ -103,21 +137,79 @@ function ProblemPage() {
     setOutput(result);
     setIsRunning(false);
 
-    // check if code executed successfully and matches expected output
     if (result.success) {
       const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
-      const testsPassed = checkIfTestsPassed(result.output, expectedOutput);
+      // CHECK ALL TEST CASES
+      const lines = result.output.trim().split("\n").filter(l => l.trim().length > 0);
+      const expectedLines = expectedOutput.trim().split("\n").filter(l => l.trim().length > 0);
+
+      // Lenient comparison: trim and ignore empty lines
+      const testsPassed = lines.length === expectedLines.length &&
+        lines.every((line, i) => line.trim() === expectedLines[i]?.trim());
 
       const memoryMB = result.memory ? (result.memory / 1024 / 1024).toFixed(2) : "N/A";
 
       if (testsPassed) {
-        triggerConfetti();
-        toast.success(`Success! Runtime: ${result.runtime}ms, Memory: ${memoryMB}MB`);
+        toast.success(`Run Success! Output matches expected.`);
       } else {
-        toast.error("Tests failed. Check your output!");
+        toast.error("Test failed. Check your output!");
       }
     } else {
       toast.error(result.error || "Code execution failed!");
+    }
+  };
+
+  const handleSubmitCode = async () => {
+    setIsRunning(true);
+    const targetContestId = contestId || "practice";
+    try {
+      const runResult = await executeCode(selectedLanguage, code, currentProblemId);
+      const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
+      const isCorrect = checkIfTestsPassed(runResult.output, expectedOutput);
+      const status = isCorrect ? "Accepted" : "Wrong Answer";
+
+      // If it ran but had a runtime error
+      if (!runResult.success) {
+        await axiosInstance.post(`/contests/${targetContestId}/submit`, {
+          problemId: currentProblemId,
+          code,
+          language: selectedLanguage,
+          status: "Runtime Error",
+          runtime: runResult.runtime,
+          memory: runResult.memory || 0
+        });
+        setOutput(runResult);
+        toast.error("Runtime Error in submission");
+        return;
+      }
+
+      // Submit the judged result
+      await axiosInstance.post(`/contests/${targetContestId}/submit`, {
+        problemId: currentProblemId,
+        code,
+        language: selectedLanguage,
+        status,
+        runtime: runResult.runtime,
+        memory: runResult.memory || 0
+      });
+
+      // Refetch history
+      await fetchSubmissions(currentProblemId);
+
+      setOutput(runResult);
+
+      if (isCorrect) {
+        toast.success(isSolved ? "Changes saved successfully!" : "Solution Accepted!");
+        if (!isSolved) triggerConfetti();
+        setIsSolved(true);
+      } else {
+        toast.error("Wrong Answer. Try again.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to submit code");
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -133,7 +225,15 @@ function ProblemPage() {
               problem={currentProblem}
               currentProblemId={currentProblemId}
               onProblemChange={handleProblemChange}
-              allProblems={Object.values(PROBLEMS)}
+              allProblems={contestData ? contestData.problems.map(p => ({
+                id: p.problemId,
+                title: PROBLEMS[p.problemId]?.title || p.title || "Unknown",
+                difficulty: PROBLEMS[p.problemId]?.difficulty || p.difficulty || "Medium",
+                score: p.score
+              })) : Object.values(PROBLEMS)}
+              contestId={contestId}
+              submissions={submissions}
+              isLoadingSubmissions={isLoadingSubmissions}
             />
           </Panel>
 
@@ -148,9 +248,12 @@ function ProblemPage() {
                   selectedLanguage={selectedLanguage}
                   code={code}
                   isRunning={isRunning}
+                  isSolved={isSolved}
+                  contestId={contestId}
                   onLanguageChange={handleLanguageChange}
                   onCodeChange={setCode}
                   onRunCode={handleRunCode}
+                  onSubmit={handleSubmitCode}
                 />
               </Panel>
 

@@ -1,7 +1,7 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
+import { useEndSession, useJoinSession, useLeaveSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../api/executor";
 import Navbar from "../components/Navbar";
@@ -25,11 +25,22 @@ function SessionPage() {
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
   const joinSessionMutation = useJoinSession();
+  const leaveSessionMutation = useLeaveSession();
   const endSessionMutation = useEndSession();
 
   const session = sessionData?.session;
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
+  
+  // Debug participant detection
+  console.log("Session debug", { 
+    session, 
+    isHost, 
+    isParticipant, 
+    userClerkId: user?.id,
+    hostClerkId: session?.host?.clerkId,
+    participantClerkId: session?.participant?.clerkId
+  });
 
   const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
     session,
@@ -99,6 +110,25 @@ function SessionPage() {
 
     setOutput(result);
     setIsRunning(false);
+  };
+
+  const handleLeave = () => {
+    console.log("handleLeave called", { isParticipant, sessionId: id, user: user?.id });
+    if (isParticipant) {
+      console.log("Calling leaveSession API");
+      leaveSessionMutation.mutate(id, { 
+        onSuccess: (data) => {
+          console.log("leaveSession success", data);
+          navigate("/dashboard");
+        },
+        onError: (error) => {
+          console.error("leaveSession error", error);
+        }
+      });
+      return;
+    }
+    console.log("Host leaving - just navigating");
+    navigate("/dashboard");
   };
 
   const handleEndSession = () => {
@@ -293,7 +323,7 @@ function SessionPage() {
                 <div className="h-full">
                   <StreamVideo client={streamClient}>
                     <StreamCall call={call}>
-                      <VideoCallUI chatClient={chatClient} channel={channel} />
+                      <VideoCallUI chatClient={chatClient} channel={channel} onLeave={handleLeave} />
                     </StreamCall>
                   </StreamVideo>
                 </div>

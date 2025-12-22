@@ -36,8 +36,8 @@ export const executeSubmission = async (req, res) => {
         // Alternatively, if the frontend sends the Expected Output, we can compare here.
 
         res.status(200).json({
-            status: "Calculated", // Let frontend decide Accepted/Wrong Answer
-            output: result.output,
+            status: result.status === "success" ? "Calculated" : "Runtime Error",
+            output: result.status === "success" ? result.output : result.error,
             runtime: result.runtime,
         });
 

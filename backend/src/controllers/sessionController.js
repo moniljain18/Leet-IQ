@@ -170,6 +170,56 @@ export async function joinSession(req, res) {
   }
 }
 
+export async function leaveSession(req, res) {
+  try {
+    console.log("leaveSession called", { params: req.params, user: req.user });
+    const { id } = req.params;
+    const userId = req.user._id;
+    const clerkId = req.user.clerkId;
+
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    if (session.status !== "active") {
+      return res.status(400).json({ message: "Cannot leave a completed session" });
+    }
+
+    // Only participant can "leave" (host should not clear host)
+    const isParticipant = session.participant && session.participant.toString() === userId.toString();
+    console.log("leaveSession check", { sessionParticipant: session.participant, userId, isParticipant });
+
+    if (!isParticipant) {
+      console.log("User is not participant, returning session as-is");
+      const populatedSession = await Session.findById(id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+      return res.status(200).json({ session: populatedSession });
+    }
+
+    // Clear participant slot -> makes room 1/2 again
+    console.log("Clearing participant slot");
+    session.participant = null;
+    await session.save();
+
+    // Optional: remove from Stream chat members (non-critical)
+    try {
+      const channel = chatClient.channel("messaging", session.callId);
+      await channel.removeMembers([clerkId]);
+    } catch (e) {
+      console.error("Stream chat remove member error (non-critical):", e.message);
+    }
+
+    const populatedSession = await Session.findById(id)
+      .populate("host", "name email profileImage clerkId")
+      .populate("participant", "name email profileImage clerkId");
+
+    return res.status(200).json({ session: populatedSession });
+  } catch (error) {
+    console.log("Error in leaveSession controller:", error.message);
+    return res.status(500).json({ message: "Internal Server Error", details: error.message });
+  }
+}
+
 export async function endSession(req, res) {
   try {
     const { id } = req.params;

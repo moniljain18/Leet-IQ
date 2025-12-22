@@ -9,6 +9,9 @@ function CodeEditorPanel({
   onLanguageChange,
   onCodeChange,
   onRunCode,
+  onSubmit,
+  isSolved,
+  contestId
 }) {
   return (
     <div className="h-full bg-base-300 flex flex-col">
@@ -19,7 +22,7 @@ function CodeEditorPanel({
             alt={LANGUAGE_CONFIG[selectedLanguage].name}
             className="size-6"
           />
-          <select className="select select-sm" value={selectedLanguage} onChange={onLanguageChange}>
+          <select className="select select-sm font-bold bg-base-200 border-none rounded-lg" value={selectedLanguage} onChange={onLanguageChange}>
             {Object.entries(LANGUAGE_CONFIG).map(([key, lang]) => (
               <option key={key} value={key}>
                 {lang.name}
@@ -28,19 +31,25 @@ function CodeEditorPanel({
           </select>
         </div>
 
-        <button className="btn btn-primary btn-sm gap-2" disabled={isRunning} onClick={onRunCode}>
-          {isRunning ? (
-            <>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-ghost btn-sm gap-2 font-bold" disabled={isRunning} onClick={onRunCode}>
+            {isRunning ? (
               <Loader2Icon className="size-4 animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
+            ) : (
               <PlayIcon className="size-4" />
-              Run Code
-            </>
-          )}
-        </button>
+            )}
+            Run
+          </button>
+
+          <button
+            className={`btn btn-sm gap-2 px-6 font-bold ${isSolved ? 'btn-secondary' : 'btn-primary'}`}
+            disabled={isRunning}
+            onClick={onSubmit}
+          >
+            {isRunning && <Loader2Icon className="size-4 animate-spin" />}
+            {isSolved ? 'Save Changes' : 'Submit'}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1">
