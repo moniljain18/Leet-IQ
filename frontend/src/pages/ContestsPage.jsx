@@ -27,34 +27,24 @@ function ContestsPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch Contests (mocked for now, but could be real)
-                const contestsRes = [
-                    {
-                        _id: "1",
-                        title: "Weekly Contest 482",
-                        startTime: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-                        participants: [{}, {}, {}],
-                        status: "active",
-                        difficulty: "Medium"
-                    },
-                    {
-                        _id: "2",
-                        title: "Biweekly Contest 173",
-                        startTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-                        participants: [{}, {}],
-                        status: "upcoming",
-                        difficulty: "Hard"
-                    },
-                    {
-                        _id: "3",
-                        title: "Spring Challenge 2024",
-                        startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-                        participants: [{}, {}, {}, {}],
-                        status: "past",
-                        difficulty: "Intermediate"
-                    }
-                ];
-                setContests(contestsRes);
+                // Fetch Contests from Backend
+                const response = await axiosInstance.get("/contests");
+
+                // Sort by status: active first, then upcoming, then past
+                const sortedContests = response.data.sort((a, b) => {
+                    if (a.status === "active" && b.status !== "active") return -1;
+                    if (a.status !== "active" && b.status === "active") return 1;
+                    return new Date(b.startTime) - new Date(a.startTime);
+                });
+
+                // Add fallback difficulty if missing (since backend model might not have it explicitly on root)
+                const mappedContests = sortedContests.map(c => ({
+                    ...c,
+                    difficulty: c.difficulty || "Hard", // Default or calculated
+                    participants: c.participants || []
+                }));
+
+                setContests(mappedContests);
 
                 // Initial fetch
                 fetchRankings();

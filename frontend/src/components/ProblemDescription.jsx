@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { getDifficultyBadgeClass } from "../lib/utils";
 import axiosInstance from "../lib/axios";
+import { useAuth } from "@clerk/clerk-react";
+import confetti from "canvas-confetti";
 
 function ProblemDescription({
   problem,
@@ -26,10 +28,18 @@ function ProblemDescription({
   const [statusFilter, setStatusFilter] = useState("all");
   const [langFilter, setLangFilter] = useState("all");
   const [solvedIds, setSolvedIds] = useState(new Set());
+  const { getToken } = useAuth();
 
   const fetchSolvedIds = async () => {
     try {
-      const response = await axiosInstance.get("/contests/submissions/solved");
+      const token = await getToken();
+      const url = contestId
+        ? `/contests/submissions/solved?contestId=${contestId}`
+        : "/contests/submissions/solved";
+
+      const response = await axiosInstance.get(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSolvedIds(new Set(response.data));
     } catch (error) {
       console.error("Failed to fetch solved IDs:", error);
@@ -39,6 +49,22 @@ function ProblemDescription({
   useEffect(() => {
     fetchSolvedIds();
   }, [submissions, currentProblemId]);
+
+  // Check for All Problems Solved in Contest
+  useEffect(() => {
+    if (contestId && allProblems.length > 0 && solvedIds.size === allProblems.length) {
+      // Trigger modal
+      const modal = document.getElementById('contest_complete_modal');
+      if (modal) {
+        modal.showModal();
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+  }, [solvedIds, allProblems.length, contestId]);
 
   const isSolved = submissions.some(s => s.status === "Accepted");
 
@@ -128,13 +154,16 @@ function ProblemDescription({
               <ChevronLeftIcon className="size-4" />
             </button>
 
-            <button
-              onClick={handleShuffle}
-              className="btn btn-ghost btn-xs rounded-lg px-2 text-primary hover:bg-primary/10"
-              title="Random Problem"
-            >
-              <ShuffleIcon className="size-3.5" />
-            </button>
+            {/* Only show shuffle in practice mode */}
+            {!contestId && (
+              <button
+                onClick={handleShuffle}
+                className="btn btn-ghost btn-sm btn-circle text-base-content/40 hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Random Problem"
+              >
+                <ShuffleIcon className="size-4" />
+              </button>
+            )}
 
             <button
               onClick={() => nextProblem && onProblemChange(nextProblem.id)}
@@ -319,6 +348,24 @@ function ProblemDescription({
           </div>
         )}
       </div>
+      {/* CONTEST COMPLETE MODAL */}
+      <dialog id="contest_complete_modal" className="modal modal-bottom sm:modal-middle">
+        <div className="modal-box text-center">
+          <h3 className="font-bold text-2xl text-primary mb-2">🎉 Congratulations Coder! 🚀</h3>
+          <p className="py-4 text-lg font-medium">You solved the entire contest!</p>
+          <div className="py-2 opacity-70">
+            <p>All {allProblems.length} problems completed.</p>
+          </div>
+          <div className="modal-action justify-center">
+            <form method="dialog">
+              <button className="btn btn-primary px-8">Awesome!</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 }

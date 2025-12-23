@@ -7,16 +7,22 @@ import { getDifficultyBadgeClass } from "../lib/utils";
 import { useState, useEffect } from "react";
 import axiosInstance from "../lib/axios";
 
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
+
 function ProblemsPage() {
   const [solvedIds, setSolvedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const { getToken } = useAuth(); // Destructure getToken
 
   const problems = Object.values(PROBLEMS);
 
   useEffect(() => {
     const fetchSolvedIds = async () => {
       try {
-        const response = await axiosInstance.get("/contests/submissions/solved");
+        const token = await getToken();
+        const response = await axiosInstance.get("/contests/submissions/solved", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         setSolvedIds(new Set(response.data));
       } catch (error) {
         console.error("Failed to fetch solved IDs:", error);
@@ -25,7 +31,7 @@ function ProblemsPage() {
       }
     };
     fetchSolvedIds();
-  }, []);
+  }, [getToken]); // Add dependency
 
   const easyProblemsCount = problems.filter((p) => p.difficulty === "Easy").length;
   const mediumProblemsCount = problems.filter((p) => p.difficulty === "Medium").length;

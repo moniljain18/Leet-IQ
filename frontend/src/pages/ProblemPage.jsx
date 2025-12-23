@@ -12,10 +12,14 @@ import axiosInstance from "../lib/axios";
 
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
+import { useAuth } from "@clerk/clerk-react";
+import { useProctoring } from "../hooks/useProctoring";
+import ProctoringOverlay from "../components/ProctoringOverlay";
 
 function ProblemPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
 
   const [currentProblemId, setCurrentProblemId] = useState("two-sum");
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
@@ -29,6 +33,9 @@ function ProblemPage() {
 
   const currentProblem = PROBLEMS[currentProblemId];
   const contestId = new URLSearchParams(window.location.search).get("contestId");
+
+  // Proctoring
+  const { isLocked, strikeCount, unlock } = useProctoring(contestId);
 
   // update problem when URL param changes
   useEffect(() => {
@@ -50,7 +57,10 @@ function ProblemPage() {
     setIsLoadingSubmissions(true);
     const targetContestId = contestId || "practice";
     try {
-      const response = await axiosInstance.get(`/contests/${targetContestId}/submissions?problemId=${problemId}`);
+      const token = await getToken();
+      const response = await axiosInstance.get(`/contests/${targetContestId}/submissions?problemId=${problemId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setSubmissions(response.data);
       setIsSolved(response.data.some(s => s.status === "Accepted"));
     } catch (e) {
@@ -62,7 +72,10 @@ function ProblemPage() {
 
   const fetchContestData = async () => {
     try {
-      const response = await axiosInstance.get(`/contests/${contestId}`);
+      const token = await getToken();
+      const response = await axiosInstance.get(`/contests/${contestId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setContestData(response.data);
     } catch (e) {
       console.error("Failed to fetch contest metadata:", e);
@@ -164,7 +177,17 @@ function ProblemPage() {
     const targetContestId = contestId || "practice";
     try {
       const runResult = await executeCode(selectedLanguage, code, currentProblemId);
-      const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
+
+      const expectedOutput = currentProblem?.expectedOutput?.[selectedLanguage];
+
+      if (!expectedOutput) {
+        console.warn(`[Judging] Missing expectedOutput for problem ${currentProblemId} in ${selectedLanguage}`);
+        // If we can't judge, we should probably just record it as "Pending" or fail gracefully
+        toast.error("Judging system error: Missing test data for this problem.");
+        setIsRunning(false);
+        return;
+      }
+
       const isCorrect = checkIfTestsPassed(runResult.output, expectedOutput);
       const status = isCorrect ? "Accepted" : "Wrong Answer";
 
@@ -177,6 +200,8 @@ function ProblemPage() {
           status: "Runtime Error",
           runtime: runResult.runtime,
           memory: runResult.memory || 0
+        }, {
+          headers: { Authorization: `Bearer ${await getToken()}` }
         });
         setOutput(runResult);
         toast.error("Runtime Error in submission");
@@ -191,6 +216,8 @@ function ProblemPage() {
         status,
         runtime: runResult.runtime,
         memory: runResult.memory || 0
+      }, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
       });
 
       // Refetch history
@@ -206,8 +233,8 @@ function ProblemPage() {
         toast.error("Wrong Answer. Try again.");
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to submit code");
+      console.error("Submission Error Details:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Failed to submit code");
     } finally {
       setIsRunning(false);
     }
@@ -216,6 +243,12 @@ function ProblemPage() {
   return (
     <div className="h-screen bg-base-100 flex flex-col">
       <Navbar />
+
+      <ProctoringOverlay
+        isLocked={isLocked}
+        strikeCount={strikeCount}
+        onUnlock={unlock}
+      />
 
       <div className="flex-1">
         <PanelGroup direction="horizontal">

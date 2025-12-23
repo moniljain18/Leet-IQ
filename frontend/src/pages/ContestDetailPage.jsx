@@ -22,6 +22,8 @@ import { getDifficultyBadgeClass } from "../lib/utils";
 import toast from "react-hot-toast";
 import axiosInstance from "../lib/axios";
 import confetti from "canvas-confetti";
+import { useProctoring } from "../hooks/useProctoring";
+import ProctoringOverlay from "../components/ProctoringOverlay";
 
 // Constants
 const TIMER_LIMIT = 900;
@@ -44,6 +46,9 @@ function ContestDetailPage() {
     const [ranking, setRanking] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [leaderboard, setLeaderboard] = useState([]);
+
+    // Proctoring
+    const { isLocked, strikeCount, unlock } = useProctoring(isJoined ? id : false);
 
     useEffect(() => {
         const fetchEssentialData = async () => {
@@ -275,6 +280,12 @@ function ContestDetailPage() {
         <div className="min-h-screen bg-base-200">
             <Navbar />
 
+            <ProctoringOverlay
+                isLocked={isLocked}
+                strikeCount={strikeCount}
+                onUnlock={unlock}
+            />
+
             <div className="max-w-4xl mx-auto px-4 py-8">
                 {/* BACK BUTTON */}
                 <button
@@ -443,8 +454,8 @@ function ContestDetailPage() {
                         <div className="grid gap-3">
                             {contest.problems.map((prob, idx) => (
                                 <Link
-                                    key={prob.id}
-                                    to={(isJoined || isEnded) ? `/problem/${prob.id}?contestId=${contest._id}` : "#"}
+                                    key={prob.id || prob.problemId}
+                                    to={(isJoined || isEnded) ? `/problem/${prob.id || prob.problemId}?contestId=${contest._id}` : "#"}
                                     className={`flex items-center justify-between p-5 rounded-2xl bg-base-100 border border-base-300 transition-all ${(isJoined || isEnded)
                                         ? "hover:border-primary hover:shadow-xl hover:-translate-y-0.5"
                                         : "opacity-60 cursor-not-allowed"

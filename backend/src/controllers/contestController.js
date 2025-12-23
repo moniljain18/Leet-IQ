@@ -85,20 +85,27 @@ export const submitToContest = async (req, res) => {
         let score = 0;
         let contest = null;
 
-        if (contestId !== "practice") {
-            contest = await Contest.findById(contestId);
-            if (!contest) {
-                return res.status(404).json({ message: "Contest not found" });
-            }
-
-            // Calculate score if Accepted
-            if (status === "Accepted") {
-                const problem = contest.problems?.find(p => p.problemId === problemId || p.id === problemId);
-                if (problem) {
-                    score = problem.score || 100;
-                } else {
-                    score = 100; // fallback
+        if (contestId && contestId !== "practice") {
+            // Check if contestId is a valid ObjectId
+            if (mongoose.Types.ObjectId.isValid(contestId)) {
+                contest = await Contest.findById(contestId);
+                if (!contest) {
+                    return res.status(404).json({ message: "Contest not found" });
                 }
+
+                // Calculate score if Accepted
+                if (status === "Accepted") {
+                    const problem = contest.problems?.find(p => p.problemId === problemId || p.id === problemId);
+                    if (problem) {
+                        score = problem.score || 100;
+                    } else {
+                        score = 100; // fallback
+                    }
+                }
+            } else {
+                // If it's not "practice" and not a valid ObjectId, it might be a malformed ID.
+                // For now, let's treat it as practice or log a warning, but NOT crash.
+                console.warn(`[Submission] Invalid contest ID format: ${contestId}. Treating as practice/custom.`);
             }
         }
 
@@ -123,7 +130,7 @@ export const submitToContest = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in submitToContest:", error);
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 };
 
@@ -232,12 +239,21 @@ export const createContest = async (req, res) => {
 
 export const getSolvedProblemIds = async (req, res) => {
     try {
+        const { contestId } = req.query;
         const mongoUserId = req.user._id;
-        console.log(`[SolvedIDs] Fetching for user: ${mongoUserId}`);
-        const solvedSubmissions = await ContestSubmission.find({
+
+        console.log(`[SolvedIDs] Fetching for user: ${mongoUserId}, contest: ${contestId || "practice (global)"}`);
+
+        const query = {
             user: mongoUserId,
             status: "Accepted"
-        }).distinct("problemId");
+        };
+
+        if (contestId) {
+            query.contest = contestId;
+        }
+
+        const solvedSubmissions = await ContestSubmission.find(query).distinct("problemId");
 
         console.log(`[SolvedIDs] Found: ${solvedSubmissions.length} problems - ${solvedSubmissions}`);
         res.status(200).json(solvedSubmissions);

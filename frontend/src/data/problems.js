@@ -1,4 +1,7 @@
+import { ADDITIONAL_PROBLEMS } from "./problems-db";
+
 export const PROBLEMS = {
+    ...ADDITIONAL_PROBLEMS,
     "two-sum": {
         id: "two-sum",
         title: "Two Sum",
