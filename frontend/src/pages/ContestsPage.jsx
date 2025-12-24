@@ -11,7 +11,7 @@ import {
     SearchIcon,
     FilterIcon
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import axiosInstance from "../lib/axios";
 

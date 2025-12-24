@@ -1,5 +1,14 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
+import User from "../models/User.js";
+
+function generateInviteCode() {
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const part1 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const part2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const part3 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `${part1}-${part2}-${part3}`;
+}
 
 export async function createSession(req, res) {
   try {
@@ -20,9 +29,18 @@ export async function createSession(req, res) {
     // generate a unique call id for stream video
     const callId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
+    // Generate unique invite code
+    let inviteCode;
+    let isUnique = false;
+    while (!isUnique) {
+      inviteCode = generateInviteCode();
+      const existing = await Session.findOne({ inviteCode });
+      if (!existing) isUnique = true;
+    }
+
     // create session in db
-    const session = await Session.create({ problem, difficulty, host: userId, callId });
-    console.log("Session created in DB:", session._id);
+    const session = await Session.create({ problem, difficulty, host: userId, callId, inviteCode });
+    console.log("Session created in DB:", session._id, "Invite Code:", inviteCode);
 
     // create stream video call
     try {
@@ -76,16 +94,39 @@ export async function getActiveSessions(_, res) {
 export async function getMyRecentSessions(req, res) {
   try {
     const userId = req.user._id;
+    const { page = 1, limit = 10, days = 30, search = "" } = req.query;
 
-    // get sessions where user is either host or participant
-    const sessions = await Session.find({
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const dateLimit = new Date();
+    dateLimit.setDate(dateLimit.getDate() - parseInt(days));
+
+    const query = {
       status: "completed",
       $or: [{ host: userId }, { participant: userId }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(20);
+      createdAt: { $gte: dateLimit },
+    };
 
-    res.status(200).json({ sessions });
+    if (search) {
+      query.problem = { $regex: search, $options: "i" };
+    }
+
+    const totalCount = await Session.countDocuments(query);
+    const sessions = await Session.find(query)
+      .populate("host", "name profileImage email clerkId")
+      .populate("participant", "name profileImage email clerkId")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      sessions,
+      pagination: {
+        totalCount,
+        totalPages: Math.ceil(totalCount / parseInt(limit)),
+        currentPage: parseInt(page),
+        limit: parseInt(limit),
+      },
+    });
   } catch (error) {
     console.log("Error in getMyRecentSessions controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -148,12 +189,19 @@ export async function joinSession(req, res) {
     session.participant = userId;
     await session.save();
 
-    // Add user to Stream chat channel
+    // Add user to Stream chat channel and video call members
     try {
       const channel = chatClient.channel("messaging", session.callId);
       await channel.addMembers([clerkId]);
+
+      const call = streamClient.video.call("default", session.callId);
+      await call.update({
+        members: {
+          [clerkId]: { role: "user" }
+        }
+      });
     } catch (streamError) {
-      console.error("Stream chat error (non-critical):", streamError.message);
+      console.error("Stream error (non-critical):", streamError.message);
       // Continue even if Stream fails - session is already saved
     }
 
@@ -201,12 +249,19 @@ export async function leaveSession(req, res) {
     session.participant = null;
     await session.save();
 
-    // Optional: remove from Stream chat members (non-critical)
+    // Optional: remove from Stream chat members and call members (non-critical)
     try {
       const channel = chatClient.channel("messaging", session.callId);
       await channel.removeMembers([clerkId]);
+
+      const call = streamClient.video.call("default", session.callId);
+      await call.update({
+        members: {
+          [clerkId]: null
+        }
+      });
     } catch (e) {
-      console.error("Stream chat remove member error (non-critical):", e.message);
+      console.error("Stream remove member error (non-critical):", e.message);
     }
 
     const populatedSession = await Session.findById(id)
@@ -254,5 +309,70 @@ export async function endSession(req, res) {
   } catch (error) {
     console.log("Error in endSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function joinByCode(req, res) {
+  try {
+    const { inviteCode } = req.body;
+    const userId = req.user._id;
+    const clerkId = req.user.clerkId;
+
+    if (!inviteCode) {
+      return res.status(400).json({ message: "Invite code is required" });
+    }
+
+    const session = await Session.findOne({ inviteCode, status: "active" });
+
+    if (!session) {
+      return res.status(404).json({ message: "Invalid or inactive invite code" });
+    }
+
+    // Reuse joining logic
+    if (session.host.toString() === userId.toString()) {
+      const populatedSession = await Session.findById(session._id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+      return res.status(200).json({ session: populatedSession });
+    }
+
+    if (session.participant && session.participant.toString() === userId.toString()) {
+      const populatedSession = await Session.findById(session._id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+      return res.status(200).json({ session: populatedSession });
+    }
+
+    if (session.participant) {
+      return res.status(409).json({ message: "Session is full" });
+    }
+
+    // Add user as participant
+    session.participant = userId;
+    await session.save();
+
+    // Add user to Stream chat channel and video call members
+    try {
+      const channel = chatClient.channel("messaging", session.callId);
+      await channel.addMembers([clerkId]);
+
+      const call = streamClient.video.call("default", session.callId);
+      await call.update({
+        members: {
+          [clerkId]: { role: "user" }
+        }
+      });
+    } catch (streamError) {
+      console.error("Stream error (non-critical):", streamError.message);
+    }
+
+    const populatedSession = await Session.findById(session._id)
+      .populate("host", "name email profileImage clerkId")
+      .populate("participant", "name email profileImage clerkId");
+
+    res.status(200).json({ session: populatedSession });
+  } catch (error) {
+    console.error("Error in joinByCode controller:", error);
+    res.status(500).json({ message: "Internal Server Error", details: error.message });
   }
 }

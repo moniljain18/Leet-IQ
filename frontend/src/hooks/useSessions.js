@@ -25,10 +25,10 @@ export const useActiveSessions = () => {
     return result;
 };
 
-export const useMyRecentSessions = () => {
+export const useMyRecentSessions = (page = 1, limit = 10, days = 30, search = "") => {
     const result = useQuery({
-        queryKey: ["myRecentSessions"],
-        queryFn: sessionApi.getMyRecentSessions,
+        queryKey: ["myRecentSessions", page, limit, days, search],
+        queryFn: () => sessionApi.getMyRecentSessions({ page, limit, days, search }),
     });
 
     return result;
@@ -40,6 +40,17 @@ export const useSessionById = (id) => {
         queryFn: () => sessionApi.getSessionById(id),
         enabled: !!id,
         refetchInterval: 5000, // refetch every 5 seconds to detect session status changes
+    });
+
+    return result;
+};
+
+export const useJoinByCode = () => {
+    const result = useMutation({
+        mutationKey: ["joinByCode"],
+        mutationFn: sessionApi.joinByCode,
+        onSuccess: () => toast.success("Joined session successfully!"),
+        onError: (error) => toast.error(error.response?.data?.message || "Invalid or inactive invite code"),
     });
 
     return result;

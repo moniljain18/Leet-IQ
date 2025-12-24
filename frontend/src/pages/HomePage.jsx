@@ -1,4 +1,4 @@
-import { Link, Navigate } from "react-router";
+import { Link, Navigate } from "react-router-dom";
 import {
   ArrowRightIcon,
   CheckIcon,

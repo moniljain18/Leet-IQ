@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router-dom";
 import { PROBLEMS } from "../data/problems";
 import Navbar from "../components/Navbar";
 
@@ -15,6 +15,7 @@ import confetti from "canvas-confetti";
 import { useAuth } from "@clerk/clerk-react";
 import { useProctoring } from "../hooks/useProctoring";
 import ProctoringOverlay from "../components/ProctoringOverlay";
+import { useClaimProblemReward } from "../hooks/useRewards";
 
 function ProblemPage() {
   const { id } = useParams();
@@ -30,6 +31,8 @@ function ProblemPage() {
   const [submissions, setSubmissions] = useState([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [contestData, setContestData] = useState(null);
+
+  const claimReward = useClaimProblemReward();
 
   const currentProblem = PROBLEMS[currentProblemId];
   const contestId = new URLSearchParams(window.location.search).get("contestId");
@@ -228,6 +231,10 @@ function ProblemPage() {
       if (isCorrect) {
         toast.success(isSolved ? "Changes saved successfully!" : "Solution Accepted!");
         if (!isSolved) triggerConfetti();
+
+        // Claim reward/update streak on every success - backend handles eligibility
+        claimReward.mutate({ problemId: id || currentProblemId, difficulty: currentProblem.difficulty });
+
         setIsSolved(true);
       } else {
         toast.error("Wrong Answer. Try again.");

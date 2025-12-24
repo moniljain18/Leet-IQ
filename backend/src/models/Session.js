@@ -31,6 +31,11 @@ const sessionSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+        inviteCode: {
+            type: String,
+            unique: true,
+            required: true,
+        },
     },
     { timestamps: true }
 );

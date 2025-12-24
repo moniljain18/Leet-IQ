@@ -12,18 +12,30 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
     const [isInitializingCall, setIsInitializingCall] = useState(true);
 
     useEffect(() => {
+        let isCancelled = false;
         let videoCall = null;
-        let chatClientInstance = null;
+        let chatInstance = null;
 
         const initCall = async () => {
-            if (!session?.callId) return;
-            if (!isHost && !isParticipant) return;
-            if (session.status === "completed") return;
+            // Wait for session data to be fully populated (host and callId are critical)
+            if (loadingSession || !session?.callId || !session?.host || (!isHost && !isParticipant)) {
+                if (!loadingSession) {
+                    setIsInitializingCall(false);
+                }
+                return;
+            }
+
+            if (session.status === "completed") {
+                setIsInitializingCall(false);
+                return;
+            }
 
             try {
+                setIsInitializingCall(true);
                 const { token, userId, userName, userImage } = await sessionApi.getStreamToken();
+                if (isCancelled) return;
 
-                const client = await initializeStreamClient(
+                const vClient = await initializeStreamClient(
                     {
                         id: userId,
                         name: userName,
@@ -32,16 +44,21 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
                     token
                 );
 
-                setStreamClient(client);
+                if (isCancelled) return;
+                setStreamClient(vClient);
 
-                videoCall = client.call("default", session.callId);
+                videoCall = vClient.call("default", session.callId);
                 await videoCall.join({ create: true });
+                if (isCancelled) {
+                    await videoCall.leave();
+                    return;
+                }
                 setCall(videoCall);
 
                 const apiKey = import.meta.env.VITE_STREAM_API_KEY;
-                chatClientInstance = StreamChat.getInstance(apiKey);
+                chatInstance = StreamChat.getInstance(apiKey);
 
-                await chatClientInstance.connectUser(
+                await chatInstance.connectUser(
                     {
                         id: userId,
                         name: userName,
@@ -49,35 +66,60 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
                     },
                     token
                 );
-                setChatClient(chatClientInstance);
+                if (isCancelled) {
+                    await chatInstance.disconnectUser();
+                    return;
+                }
+                setChatClient(chatInstance);
 
-                const chatChannel = chatClientInstance.channel("messaging", session.callId);
+                const chatChannel = chatInstance.channel("messaging", session.callId);
                 await chatChannel.watch();
+                if (isCancelled) return;
                 setChannel(chatChannel);
+
             } catch (error) {
-                toast.error("Failed to join video call");
-                console.error("Error init call", error);
+                console.error("useStreamClient: Initialization error", error);
+                if (!isCancelled) {
+                    // toast.error("Failed to join video call"); // Avoid spamming toasts during race conditions
+                }
             } finally {
-                setIsInitializingCall(false);
+                if (!isCancelled) {
+                    setIsInitializingCall(false);
+                }
             }
         };
 
-        if (session && !loadingSession) initCall();
+        initCall();
 
-        // cleanup - performance reasons
         return () => {
-            // iife
-            (async () => {
+            isCancelled = true;
+            // Note: We don't call setIsInitializingCall(true) here anymore 
+            // as it causes blank screens on rapid remounts.
+
+            const cleanup = async () => {
                 try {
-                    if (videoCall) await videoCall.leave();
-                    if (chatClientInstance) await chatClientInstance.disconnectUser();
+                    if (videoCall) {
+                        await videoCall.leave();
+                    }
+                    if (chatInstance) {
+                        await chatInstance.disconnectUser();
+                    }
+                    // For singletons, we don't necessarily want to disconnect the whole client 
+                    // on every unmount if we might come right back.
+                    // But we'll call it for now to be safe, as it was in the "working" state.
                     await disconnectStreamClient();
                 } catch (error) {
-                    console.error("Cleanup error:", error);
+                    console.error("useStreamClient: Cleanup error", error);
+                } finally {
+                    setStreamClient(null);
+                    setCall(null);
+                    setChatClient(null);
+                    setChannel(null);
                 }
-            })();
+            };
+            cleanup();
         };
-    }, [session, loadingSession, isHost, isParticipant]);
+    }, [session?.callId, session?.status, loadingSession, isHost, isParticipant]);
 
     return {
         streamClient,

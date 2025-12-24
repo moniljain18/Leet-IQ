@@ -5,11 +5,14 @@ const apiKey = import.meta.env.VITE_STREAM_API_KEY;
 let client = null;
 
 export const initializeStreamClient = async (user, token) => {
-    // if client exists with same user instead of creating again return it
+    // If we have an existing client for the same user, and it's not disconnected, reuse it
+    if (client && client.user?.id === user.id) {
+        return client;
+    }
 
-    if (client && client?.user?.id === user.id) return client;
-
+    // Otherwise, disconnect any existing client properly
     if (client) {
+        console.log("Disconnecting existing Stream client before re-initializing...");
         await disconnectStreamClient();
     }
 
@@ -21,6 +24,7 @@ export const initializeStreamClient = async (user, token) => {
         token,
     });
 
+    console.log("Stream client initialized for user:", user.id);
     return client;
 };
 

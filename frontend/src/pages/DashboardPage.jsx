@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useActiveSessions, useCreateSession, useMyRecentSessions } from "../hooks/useSessions";
@@ -9,6 +9,9 @@ import StatsCards from "../components/StatsCards";
 import ActiveSessions from "../components/ActiveSessions";
 import RecentSessions from "../components/RecentSessions";
 import CreateSessionModal from "../components/CreateSessionModal";
+import { useProfile } from "../hooks/useAuth";
+import { useDailyCheckIn } from "../hooks/useRewards";
+import { useEffect } from "react";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -16,10 +19,22 @@ function DashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [roomConfig, setRoomConfig] = useState({ problem: "", difficulty: "" });
 
+  const { data: profile } = useProfile();
+
+  const [recentSessionPage, setRecentSessionPage] = useState(1);
+  const [recentSessionLimit, setRecentSessionLimit] = useState(9);
+  const [recentSessionDays, setRecentSessionDays] = useState(30);
+  const [recentSessionSearch, setRecentSessionSearch] = useState("");
+
   const createSessionMutation = useCreateSession();
 
   const { data: activeSessionsData, isLoading: loadingActiveSessions } = useActiveSessions();
-  const { data: recentSessionsData, isLoading: loadingRecentSessions } = useMyRecentSessions();
+  const { data: recentSessionsData, isLoading: loadingRecentSessions } = useMyRecentSessions(
+    recentSessionPage,
+    recentSessionLimit,
+    recentSessionDays,
+    recentSessionSearch
+  );
 
   const handleCreateRoom = () => {
     if (!roomConfig.problem || !roomConfig.difficulty) return;
@@ -42,11 +57,24 @@ function DashboardPage() {
     );
   };
 
+  const handleRecentSessionPageChange = (page, limit, days, search) => {
+    setRecentSessionPage(page);
+    setRecentSessionLimit(limit);
+    setRecentSessionDays(days);
+    if (search !== undefined) setRecentSessionSearch(search);
+  };
+
+  const handleRecentSessionSearch = (search) => {
+    setRecentSessionSearch(search);
+    setRecentSessionPage(1); // Reset to page 1 when searching
+  };
+
   const activeSessions = activeSessionsData?.sessions || [];
   const recentSessions = recentSessionsData?.sessions || [];
+  const recentSessionsPagination = recentSessionsData?.pagination;
 
   const isUserInSession = (session) => {
-    if (!user.id) return false;
+    if (!user || !user.id) return false;
 
     return session.host?.clerkId === user.id || session.participant?.clerkId === user.id;
   };
@@ -62,7 +90,7 @@ function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <StatsCards
               activeSessionsCount={activeSessions.length}
-              recentSessionsCount={recentSessions.length}
+              recentSessionsCount={recentSessionsPagination?.totalCount || 0}
             />
             <ActiveSessions
               sessions={activeSessions}
@@ -71,7 +99,15 @@ function DashboardPage() {
             />
           </div>
 
-          <RecentSessions sessions={recentSessions} isLoading={loadingRecentSessions} />
+          <RecentSessions
+            sessions={recentSessions}
+            isLoading={loadingRecentSessions}
+            pagination={recentSessionsPagination}
+            onPageChange={handleRecentSessionPageChange}
+            onFilterChange={handleRecentSessionPageChange}
+            onSearchChange={handleRecentSessionSearch}
+            searchQuery={recentSessionSearch}
+          />
         </div>
       </div>
 
@@ -83,6 +119,8 @@ function DashboardPage() {
         onCreateRoom={handleCreateRoom}
         isCreating={createSessionMutation.isPending}
       />
+
+      {/* DailyClaimModal is now replaced by the Navbar popover system as per user feedback */}
     </>
   );
 }

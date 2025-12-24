@@ -1,13 +1,13 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEndSession, useJoinSession, useLeaveSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../api/executor";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 
@@ -21,6 +21,8 @@ function SessionPage() {
   const { user } = useUser();
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
@@ -31,23 +33,14 @@ function SessionPage() {
   const session = sessionData?.session;
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
-  
-  // Debug participant detection
-  console.log("Session debug", { 
-    session, 
-    isHost, 
-    isParticipant, 
-    userClerkId: user?.id,
-    hostClerkId: session?.host?.clerkId,
-    participantClerkId: session?.participant?.clerkId
-  });
 
-  const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
+  const streamState = useStreamClient(
     session,
     loadingSession,
     isHost,
     isParticipant
   );
+  const { call, channel, chatClient, isInitializingCall, streamClient } = streamState;
 
   // find the problem data based on session problem title
   const problemData = session?.problem
@@ -55,16 +48,22 @@ function SessionPage() {
     : null;
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-  const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
+  const [code, setCode] = useState("");
 
-  // auto-join session if user is not already a participant and not the host
+  // Update code when problem loads or changes
+  useEffect(() => {
+    if (problemData?.starterCode?.[selectedLanguage]) {
+      setCode(problemData.starterCode[selectedLanguage]);
+    }
+  }, [problemData, selectedLanguage]);
+
+  // Handle auto-join
   useEffect(() => {
     if (!session || !user || loadingSession) return;
     if (isHost || isParticipant) return;
+    if (session.status !== "active") return;
 
     joinSessionMutation.mutate(id, { onSuccess: refetch });
-
-    // remove the joinSessionMutation, refetch from dependencies to avoid infinite loop
   }, [session, user, loadingSession, isHost, isParticipant, id]);
 
   // redirect the "participant" when session ends
@@ -74,12 +73,30 @@ function SessionPage() {
     if (session.status === "completed") navigate("/dashboard");
   }, [session, loadingSession, navigate]);
 
-  // update code when problem loads or changes
-  useEffect(() => {
-    if (problemData?.starterCode?.[selectedLanguage]) {
-      setCode(problemData.starterCode[selectedLanguage]);
-    }
-  }, [problemData, selectedLanguage]);
+  if (loadingSession) {
+    return (
+      <div className="h-screen bg-base-100 flex flex-col items-center justify-center">
+        <Loader2Icon className="w-12 h-12 animate-spin text-primary mb-4" />
+        <p className="text-xl font-bold font-mono tracking-tighter uppercase">Loading Session Data...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="h-screen bg-base-100 flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <PhoneOffIcon className="w-16 h-16 mx-auto text-error mb-4" />
+            <h1 className="text-2xl font-bold">Session Not Found</h1>
+            <p className="text-base-content/60 mt-2">This session may have ended or does not exist.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
@@ -116,7 +133,7 @@ function SessionPage() {
     console.log("handleLeave called", { isParticipant, sessionId: id, user: user?.id });
     if (isParticipant) {
       console.log("Calling leaveSession API");
-      leaveSessionMutation.mutate(id, { 
+      leaveSessionMutation.mutate(id, {
         onSuccess: (data) => {
           console.log("leaveSession success", data);
           navigate("/dashboard");
@@ -136,6 +153,19 @@ function SessionPage() {
       // this will navigate the HOST to dashboard
       endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
     }
+  };
+
+  const copyInviteLink = () => {
+    const link = `${window.location.origin}/join/${session?.inviteCode}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const copyInviteCode = () => {
+    navigator.clipboard.writeText(session?.inviteCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   return (
@@ -164,6 +194,30 @@ function SessionPage() {
                           Host: {session?.host?.name || "Loading..."} •{" "}
                           {session?.participant ? 2 : 1}/2 participants
                         </p>
+
+                        {session?.inviteCode && (
+                          <div className="flex items-center gap-4 mt-3">
+                            <div className="flex items-center gap-2 bg-base-200 px-3 py-1.5 rounded-lg border border-base-300">
+                              <span className="text-xs font-bold uppercase text-base-content/40">Code</span>
+                              <span className="font-mono font-bold text-primary">{session.inviteCode}</span>
+                              <button
+                                onClick={copyInviteCode}
+                                className="ml-1 p-1 hover:bg-base-300 rounded transition-colors"
+                                title="Copy code"
+                              >
+                                {copiedCode ? <CheckIcon className="w-3.5 h-3.5 text-success" /> : <CopyIcon className="w-3.5 h-3.5 text-base-content/40" />}
+                              </button>
+                            </div>
+
+                            <button
+                              onClick={copyInviteLink}
+                              className="btn btn-ghost btn-xs gap-2 text-primary hover:bg-primary/10 transition-all normal-case"
+                            >
+                              {copiedLink ? <CheckIcon className="w-3.5 h-3.5" /> : <CopyIcon className="w-3.5 h-3.5" />}
+                              {copiedLink ? "Copied Link!" : "Copy Invite Link"}
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -304,30 +358,18 @@ function SessionPage() {
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
                     <Loader2Icon className="w-12 h-12 mx-auto animate-spin text-primary mb-4" />
-                    <p className="text-lg">Connecting to video call...</p>
+                    <p className="text-lg font-mono tracking-tighter uppercase">Connecting to video call...</p>
                   </div>
                 </div>
-              ) : !streamClient || !call ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="card bg-base-100 shadow-xl max-w-md">
-                    <div className="card-body items-center text-center">
-                      <div className="w-24 h-24 bg-error/10 rounded-full flex items-center justify-center mb-4">
-                        <PhoneOffIcon className="w-12 h-12 text-error" />
-                      </div>
-                      <h2 className="card-title text-2xl">Connection Failed</h2>
-                      <p className="text-base-content/70">Unable to connect to the video call</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              ) : streamClient && call ? (
                 <div className="h-full">
                   <StreamVideo client={streamClient}>
                     <StreamCall call={call}>
-                      <VideoCallUI chatClient={chatClient} channel={channel} onLeave={handleLeave} />
+                      <VideoCallUI chatClient={chatClient} channel={channel} onLeave={handleLeave} session={session} />
                     </StreamCall>
                   </StreamVideo>
                 </div>
-              )}
+              ) : null}
             </div>
           </Panel>
         </PanelGroup>

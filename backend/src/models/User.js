@@ -20,6 +20,26 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true,
         },
+        coins: {
+            type: Number,
+            default: 0,
+        },
+        streak: {
+            type: Number,
+            default: 0,
+        },
+        lastSolvedDate: {
+            type: Date,
+            default: null,
+        },
+        dailyCheckInDate: {
+            type: Date,
+            default: null,
+        },
+        solvedProblems: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Problem",
+        }],
     },
     { timestamps: true } // createdAt, updatedAt
 );
