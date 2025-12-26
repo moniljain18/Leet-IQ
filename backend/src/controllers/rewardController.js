@@ -68,32 +68,52 @@ export const claimProblemReward = async (req, res) => {
         const lastSolved = user.lastSolvedDate ? new Date(user.lastSolvedDate) : null;
         const lastSolvedDate = lastSolved ? new Date(lastSolved.getFullYear(), lastSolved.getMonth(), lastSolved.getDate()) : null;
 
-        // Streak logic
-        if (!lastSolvedDate) {
-            user.streak = 1;
-        } else {
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
+        // Streak logic - More robust normalization
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
-            if (lastSolvedDate.getTime() === yesterday.getTime()) {
+        console.log(`[Reward] Problem: ${problemId}, User: ${user.name}`);
+        console.log(`[Reward] Debug Dates - Normalized Today: ${today.toISOString()}, Normalized Yesterday: ${yesterday.toISOString()}, Normalized LastSolved: ${lastSolvedDate ? lastSolvedDate.toISOString() : 'NULL'}`);
+
+        if (!lastSolvedDate) {
+            // First time ever solving a problem
+            user.streak = 1;
+            console.log("[Reward] First time solve - Streak set to 1");
+        } else {
+            const lastSolvedTime = lastSolvedDate.getTime();
+            const todayTime = today.getTime();
+            const yesterdayTime = yesterday.getTime();
+
+            if (lastSolvedTime === todayTime) {
+                // Already solved a problem today - streak stays the same
+                console.log(`[Reward] Already solved today - Streak remains at ${user.streak}`);
+            } else if (lastSolvedTime === yesterdayTime) {
+                // Solved yesterday, solving today - increment streak!
                 user.streak += 1;
+                console.log(`[Reward] Sequential solve - Streak incremented to ${user.streak}`);
                 // 7-day bonus
                 if (user.streak % 7 === 0) {
                     coinGain += 50;
+                    console.log("[Reward] 7-day bonus granted (+50 coins)");
                 }
-            } else if (lastSolvedDate.getTime() < yesterday.getTime()) {
+            } else if (lastSolvedTime < yesterdayTime) {
+                // Solved before yesterday - streak broken, restart at 1
                 user.streak = 1;
+                console.log("[Reward] Streak broken - Restarting at 1");
             }
-            // If already solved today, streak stays the same
         }
 
         user.coins += coinGain;
         user.lastSolvedDate = now;
+
+        // Ensure problemId is saved as string (it is now a string array in model)
         if (!user.solvedProblems.includes(problemId)) {
             user.solvedProblems.push(problemId);
+            console.log(`[Reward] Problem ${problemId} added to solvedProblems`);
         }
 
         await user.save();
+        console.log(`[Reward] Save successful - Final Streak: ${user.streak}, Final Coins: ${user.coins}`);
 
         res.status(200).json({
             message: "Reward claimed",

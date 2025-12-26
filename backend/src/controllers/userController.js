@@ -7,15 +7,25 @@ export const getProfile = async (req, res) => {
             const now = new Date();
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const lastSolved = new Date(user.lastSolvedDate);
-            const lastSolvedDate = new Date(lastSolved.getFullYear(), lastSolved.getMonth(), lastSolved.getDate());
+            const lastSolvedDateMidnight = new Date(lastSolved.getFullYear(), lastSolved.getMonth(), lastSolved.getDate());
 
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
 
-            // If last solved was before yesterday, streak is broken
-            if (lastSolvedDate.getTime() < yesterday.getTime()) {
+            console.log(`[getProfile] Investigating Streak for ${user.name}:`);
+            console.log(` - Current Streak: ${user.streak}`);
+            console.log(` - Today: ${today.toDateString()}`);
+            console.log(` - Last Solved: ${lastSolvedDateMidnight.toDateString()}`);
+            console.log(` - Yesterday: ${yesterday.toDateString()}`);
+
+            // If last solved was strictly before yesterday, streak is broken
+            // Comparison: if lastSolved is NOT today AND lastSolved is NOT yesterday -> reset
+            if (lastSolvedDateMidnight.getTime() < yesterday.getTime()) {
+                console.log(`[getProfile] Streak broken! Last solved was before yesterday. Resetting to 0.`);
                 user.streak = 0;
                 await user.save();
+            } else {
+                console.log(`[getProfile] Streak maintained. User solved today or yesterday.`);
             }
         }
 

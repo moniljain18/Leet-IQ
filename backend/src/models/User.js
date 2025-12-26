@@ -37,8 +37,7 @@ const userSchema = new mongoose.Schema(
             default: null,
         },
         solvedProblems: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Problem",
+            type: String,
         }],
     },
     { timestamps: true } // createdAt, updatedAt

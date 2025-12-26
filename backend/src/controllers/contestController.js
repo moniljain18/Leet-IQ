@@ -140,13 +140,13 @@ export const getContestSubmissions = async (req, res) => {
         const { problemId } = req.query;
         const mongoUserId = req.user._id;
 
-        let contestMatch = contestId.toString();
-        // Mongoose find() will handle cast to String if schema says String.
-
         const query = {
-            contest: contestMatch,
             user: mongoUserId
         };
+
+        if (contestId && contestId !== "practice") {
+            query.contest = contestId.toString();
+        }
 
         if (problemId) {
             query.problemId = problemId;

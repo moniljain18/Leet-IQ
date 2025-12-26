@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import axiosInstance from "../lib/axios";
+import { useAuth } from "@clerk/clerk-react";
 
 export const useProfile = () => {
+    const { getToken } = useAuth();
     return useQuery({
         queryKey: ["userProfile"],
         queryFn: async () => {
-            const response = await axiosInstance.get("/users/profile");
+            const token = await getToken();
+            const response = await axiosInstance.get("/users/profile", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             return response.data;
         },
-        staleTime: 1000, // 1 second - make it more dynamic
         refetchOnWindowFocus: true,
     });
 };

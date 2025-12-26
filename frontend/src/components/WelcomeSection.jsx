@@ -35,12 +35,6 @@ function WelcomeSection({ onCreateSession }) {
               <h1 className="text-5xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
                 Welcome back, {user?.firstName || "there"}!
               </h1>
-              {profile?.streak > 0 && (
-                <div className="flex items-center gap-1 bg-orange-500/10 text-orange-500 px-3 py-1 rounded-full border border-orange-500/20 animate-bounce">
-                  <Flame className="size-4 fill-orange-500" />
-                  <span className="text-sm font-bold">{profile.streak} Day Streak!</span>
-                </div>
-              )}
             </div>
             <p className="text-xl text-base-content/60 ml-16">
               Ready to level up your coding skills?

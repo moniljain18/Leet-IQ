@@ -33,6 +33,8 @@ export async function executeCode(language, code) {
         });
 
         const { run } = response.data;
+        const runtimeMs = Math.round((run.time || 0) * 1000);
+        const memoryBytes = run.memory || 0;
 
         // Piston returns 0 for success, non-zero for error
         if (run.stderr) {
@@ -40,8 +42,8 @@ export async function executeCode(language, code) {
                 status: "error",
                 output: run.stdout,
                 error: run.stderr,
-                runtime: run.time || 0,
-                memory: 0, // Piston v2 doesn't always provide memory easily
+                runtime: runtimeMs,
+                memory: memoryBytes,
             };
         }
 
@@ -49,8 +51,8 @@ export async function executeCode(language, code) {
             status: "success",
             output: run.stdout,
             error: null,
-            runtime: run.time || 0,
-            memory: 0,
+            runtime: runtimeMs,
+            memory: memoryBytes,
         };
 
     } catch (err) {

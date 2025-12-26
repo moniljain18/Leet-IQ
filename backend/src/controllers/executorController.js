@@ -39,6 +39,7 @@ export const executeSubmission = async (req, res) => {
             status: result.status === "success" ? "Calculated" : "Runtime Error",
             output: result.status === "success" ? result.output : result.error,
             runtime: result.runtime,
+            memory: result.memory
         });
 
     } catch (error) {

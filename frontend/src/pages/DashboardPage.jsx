@@ -92,11 +92,13 @@ function DashboardPage() {
               activeSessionsCount={activeSessions.length}
               recentSessionsCount={recentSessionsPagination?.totalCount || 0}
             />
-            <ActiveSessions
-              sessions={activeSessions}
-              isLoading={loadingActiveSessions}
-              isUserInSession={isUserInSession}
-            />
+            <div className="lg:col-span-2">
+              <ActiveSessions
+                sessions={activeSessions}
+                isLoading={loadingActiveSessions}
+                isUserInSession={isUserInSession}
+              />
+            </div>
           </div>
 
           <RecentSessions

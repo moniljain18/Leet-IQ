@@ -191,16 +191,14 @@ function ProblemDescription({
             <FileTextIcon className="size-4" />
             Description
           </button>
-          {contestId && (
-            <button
-              onClick={() => setActiveTab("submissions")}
-              className={`py-3 px-2 flex items-center gap-2 border-b-2 transition-all font-medium text-sm ${activeTab === "submissions" ? "border-primary text-primary" : "border-transparent text-base-content/60 hover:text-base-content"
-                }`}
-            >
-              <HistoryIcon className="size-4" />
-              Submissions
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab("submissions")}
+            className={`py-3 px-2 flex items-center gap-2 border-b-2 transition-all font-medium text-sm ${activeTab === "submissions" ? "border-primary text-primary" : "border-transparent text-base-content/60 hover:text-base-content"
+              }`}
+          >
+            <HistoryIcon className="size-4" />
+            Submissions
+          </button>
         </div>
       </div>
 
@@ -317,32 +315,49 @@ function ProblemDescription({
                 No submissions found
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredSubmissions.map((s) => (
-                  <div key={s._id} className="card bg-base-100 border border-base-300 p-4 rounded-2xl hover:border-primary transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {s.status === "Accepted" ? (
-                          <CheckCircle2Icon className="size-4 text-success" />
-                        ) : (
-                          <XCircleIcon className="size-4 text-error" />
-                        )}
-                        <span className={`font-bold text-sm ${s.status === "Accepted" ? "text-success" : "text-error"}`}>
-                          {s.status}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-base-content/40">
-                        {new Date(s.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="badge badge-outline badge-sm rounded-lg opacity-60">{s.language}</div>
-                      <div className="text-xs font-mono text-base-content/60">
-                        {s.runtime}ms • {s.score} pts
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-base-100 border border-base-300 rounded-2xl overflow-hidden shadow-sm">
+                <table className="table w-full border-collapse">
+                  <thead>
+                    <tr className="bg-base-200/50 text-base-content/50 border-b border-base-300">
+                      <th className="py-3 px-4 text-[10px] font-black uppercase tracking-widest text-left">Status</th>
+                      <th className="py-3 px-4 text-[10px] font-black uppercase tracking-widest text-left">Language</th>
+                      <th className="py-3 px-4 text-[10px] font-black uppercase tracking-widest text-left">Runtime</th>
+                      <th className="py-3 px-4 text-[10px] font-black uppercase tracking-widest text-left">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-base-300">
+                    {filteredSubmissions.map((s) => (
+                      <tr key={s._id} className="hover:bg-primary/5 transition-colors group">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            {s.status === "Accepted" ? (
+                              <CheckCircle2Icon className="size-4 text-success" />
+                            ) : (
+                              <XCircleIcon className="size-4 text-error" />
+                            )}
+                            <span className={`font-black text-sm tracking-tight ${s.status === "Accepted" ? "text-success" : "text-error"}`}>
+                              {s.status}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-xs font-bold opacity-60">
+                          <code className="bg-base-300/50 px-2 py-1 rounded text-primary">{s.language}</code>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-mono font-bold text-base-content/80 group-hover:text-primary transition-colors">{s.runtime || 0} ms</span>
+                            <span className="text-[10px] opacity-40 font-bold uppercase tracking-widest">Memory: {(s.memory / 1024 / 1024).toFixed(1)}MB</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-[10px] font-bold opacity-30 whitespace-nowrap">
+                            {new Date(s.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

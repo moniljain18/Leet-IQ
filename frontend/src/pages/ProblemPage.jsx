@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PROBLEMS } from "../data/problems";
 import Navbar from "../components/Navbar";
+import { useProfile } from "../hooks/useAuth";
 
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import ProblemDescription from "../components/ProblemDescription";
@@ -16,11 +17,13 @@ import { useAuth } from "@clerk/clerk-react";
 import { useProctoring } from "../hooks/useProctoring";
 import ProctoringOverlay from "../components/ProctoringOverlay";
 import { useClaimProblemReward } from "../hooks/useRewards";
+import ChallengeCompletionModal from "../components/ChallengeCompletionModal";
 
 function ProblemPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getToken } = useAuth();
+  const { data: profile } = useProfile();
 
   const [currentProblemId, setCurrentProblemId] = useState("two-sum");
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
@@ -31,6 +34,8 @@ function ProblemPage() {
   const [submissions, setSubmissions] = useState([]);
   const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [contestData, setContestData] = useState(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [newStreak, setNewStreak] = useState(0);
 
   const claimReward = useClaimProblemReward();
 
@@ -65,7 +70,15 @@ function ProblemPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSubmissions(response.data);
-      setIsSolved(response.data.some(s => s.status === "Accepted"));
+      const successfulSubmissions = response.data.filter(s => s.status === "Accepted");
+      setIsSolved(successfulSubmissions.length > 0);
+
+      // PERSISTENCE: If the user has already solved this in the current language, load their BEST code
+      const lastSuccessfulSolveForLanguage = successfulSubmissions.find(s => s.language === selectedLanguage);
+      if (lastSuccessfulSolveForLanguage) {
+        console.log(`[Persistence] Loading previous solution for ${selectedLanguage}`);
+        setCode(lastSuccessfulSolveForLanguage.code);
+      }
     } catch (e) {
       console.error("Failed to fetch submissions:", e);
     } finally {
@@ -232,8 +245,31 @@ function ProblemPage() {
         toast.success(isSolved ? "Changes saved successfully!" : "Solution Accepted!");
         if (!isSolved) triggerConfetti();
 
-        // Claim reward/update streak on every success - backend handles eligibility
-        claimReward.mutate({ problemId: id || currentProblemId, difficulty: currentProblem.difficulty });
+        // Only show modal if it's the FIRST solve of the day
+        const isAlreadyCompleted = profile?.lastSolvedDate && new Date(profile.lastSolvedDate).toDateString() === new Date().toDateString();
+        const rewardProblemId = id || currentProblemId;
+
+        claimReward.mutate({
+          problemId: rewardProblemId,
+          difficulty: currentProblem.difficulty
+        }, {
+          onSuccess: (data) => {
+            console.log("[ProblemPage] Reward claimed successfully response:", data);
+
+            if (!isAlreadyCompleted) {
+              const streakToDisplay = typeof data.streak === 'number' ? data.streak : 1;
+              setNewStreak(streakToDisplay);
+              setShowCompletionModal(true);
+              console.log(`[ProblemPage] Modal triggered with streak: ${streakToDisplay}`);
+            } else {
+              console.log("[ProblemPage] Streak already completed today, skipping modal.");
+            }
+          },
+          onError: (err) => {
+            console.error("[ProblemPage] Reward claim failed:", err);
+            toast.error("Failed to update streak/coins. Please try again.");
+          }
+        });
 
         setIsSolved(true);
       } else {
@@ -308,6 +344,11 @@ function ProblemPage() {
           </Panel>
         </PanelGroup>
       </div>
+      <ChallengeCompletionModal
+        isOpen={showCompletionModal}
+        onClose={() => setShowCompletionModal(false)}
+        streak={newStreak}
+      />
     </div>
   );
 }
