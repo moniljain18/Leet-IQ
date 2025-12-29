@@ -6,9 +6,9 @@ RUN addgroup -S coderunner && adduser -S coderunner -G coderunner
 
 RUN pip install --no-cache-dir numpy
 
-COPY execute-py.sh /app/execute.sh
+COPY --chown=coderunner:coderunner execute-py.sh /app/execute.sh
 RUN chmod +x /app/execute.sh
 
 USER coderunner
 
-CMD ["/bin/sh"]
+ENTRYPOINT ["/app/execute.sh"]

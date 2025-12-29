@@ -9,7 +9,8 @@ import {
     getContestSubmissions,
     getLeaderboard,
     createContest,
-    getSolvedProblemIds
+    getSolvedProblemIds,
+    updateSubmissionNotes
 } from "../controllers/contestController.js";
 
 const router = express.Router();
@@ -23,5 +24,6 @@ router.delete("/:id/register", protectRoute, cancelRegistration);
 router.post("/:id/submit", protectRoute, submitToContest);
 router.get("/:id/submissions", protectRoute, getContestSubmissions);
 router.get("/:id/leaderboard", protectRoute, getLeaderboard);
+router.put("/submissions/:id/notes", protectRoute, updateSubmissionNotes);
 
 export default router;

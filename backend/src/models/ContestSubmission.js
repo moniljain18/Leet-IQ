@@ -38,6 +38,12 @@ const contestSubmissionSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        benchmarks: {
+            type: Object, // Stores runtimePercentile, memoryPercentile, distributions
+        },
+        notes: {
+            type: String, // User-provided notes for the submission
+        },
         submittedAt: {
             type: Date,
             default: Date.now,

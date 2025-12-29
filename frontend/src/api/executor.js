@@ -1,17 +1,23 @@
 import axiosInstance from "../lib/axios";
 
-export const executeCode = async (language, code, problemId) => {
+export const executeCode = async (language, code, problemId, isSubmit = false) => {
     try {
         const response = await axiosInstance.post("/execute", {
             language,
             code,
-            problemId
+            problemId,
+            isSubmit
         });
 
-        // Backend returns: { status, output, expectedOutput, runtime, error }
-        // Frontend expects: { success, output, error, runtime, memory }
-
         const data = response.data;
+
+        // If it was a judging run, we return the full data object
+        if (isSubmit) {
+            return {
+                success: data.status === "Accepted",
+                ...data
+            };
+        }
 
         if (data.status === "Runtime Error") {
             return {
@@ -19,12 +25,9 @@ export const executeCode = async (language, code, problemId) => {
                 output: data.output || "",
                 error: `Runtime Error:\n${data.output}`,
                 runtime: data.runtime || 0,
+                memory: data.memory || 0
             };
         }
-
-        // If backend says success (even if Wrong Answer, purely code execution perspective)
-        // Ideally backend should return strict success/fail field.
-        // Based on our controller, we return 200 for both success and runtime error if handled.
 
         return {
             success: true,

@@ -13,7 +13,27 @@ import {
 import { getDifficultyBadgeClass } from "../lib/utils";
 import axiosInstance from "../lib/axios";
 import { useAuth } from "@clerk/clerk-react";
+import SubmissionResult from "./SubmissionResult";
 import confetti from "canvas-confetti";
+
+function SparklesIcon({ size, className }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+      <path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" />
+    </svg>
+  );
+}
 
 function ProblemDescription({
   problem,
@@ -22,7 +42,9 @@ function ProblemDescription({
   allProblems,
   contestId,
   submissions = [],
-  isLoadingSubmissions = false
+  isLoadingSubmissions = false,
+  selectedSubmission,
+  setSelectedSubmission
 }) {
   const [activeTab, setActiveTab] = useState("description");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -87,6 +109,17 @@ function ProblemDescription({
     const matchesLang = langFilter === "all" || s.language === langFilter;
     return matchesStatus && matchesLang;
   });
+
+  if (selectedSubmission) {
+    return (
+      <div className="h-full flex flex-col bg-base-100">
+        <SubmissionResult
+          result={selectedSubmission}
+          onBack={() => setSelectedSubmission(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-base-100">
@@ -327,7 +360,11 @@ function ProblemDescription({
                   </thead>
                   <tbody className="divide-y divide-base-300">
                     {filteredSubmissions.map((s) => (
-                      <tr key={s._id} className="hover:bg-primary/5 transition-colors group">
+                      <tr
+                        key={s._id}
+                        className="hover:bg-primary/5 transition-colors group cursor-pointer"
+                        onClick={() => setSelectedSubmission(s)}
+                      >
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-2">
                             {s.status === "Accepted" ? (
@@ -385,21 +422,5 @@ function ProblemDescription({
   );
 }
 
-const SparklesIcon = ({ size, className }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-    <path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" />
-  </svg>
-);
 
 export default ProblemDescription;

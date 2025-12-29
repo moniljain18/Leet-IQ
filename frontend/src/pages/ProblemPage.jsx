@@ -18,6 +18,8 @@ import { useProctoring } from "../hooks/useProctoring";
 import ProctoringOverlay from "../components/ProctoringOverlay";
 import { useClaimProblemReward } from "../hooks/useRewards";
 import ChallengeCompletionModal from "../components/ChallengeCompletionModal";
+import SubmissionResult from "../components/SubmissionResult";
+import { ChevronUpIcon, ChevronDownIcon, CheckCircle2Icon, TerminalIcon, Maximize2Icon } from "lucide-react";
 
 function ProblemPage() {
   const { id } = useParams();
@@ -36,6 +38,9 @@ function ProblemPage() {
   const [contestData, setContestData] = useState(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [newStreak, setNewStreak] = useState(0);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [consoleHeight, setConsoleHeight] = useState(30);
 
   const claimReward = useClaimProblemReward();
 
@@ -49,11 +54,24 @@ function ProblemPage() {
   useEffect(() => {
     if (id && PROBLEMS[id]) {
       setCurrentProblemId(id);
-      setCode(PROBLEMS[id].starterCode[selectedLanguage]);
       setOutput(null);
-      fetchSubmissions(id);
+      setSelectedSubmission(null);
+      fetchSubmissions(id, selectedLanguage);
     }
-  }, [id, selectedLanguage, contestId]);
+  }, [id, contestId]);
+
+  // Handle language change persistence separately
+  useEffect(() => {
+    if (currentProblemId && id) {
+      const savedSubmission = submissions.find(s => s.language === selectedLanguage && s.status === "Accepted");
+      if (savedSubmission) {
+        console.log(`[Persistence] Loading saved ${selectedLanguage} code`);
+        setCode(savedSubmission.code);
+      } else {
+        setCode(PROBLEMS[id].starterCode[selectedLanguage]);
+      }
+    }
+  }, [selectedLanguage]);
 
   useEffect(() => {
     if (contestId) {
@@ -61,7 +79,7 @@ function ProblemPage() {
     }
   }, [contestId]);
 
-  const fetchSubmissions = async (problemId) => {
+  const fetchSubmissions = async (problemId, lang) => {
     setIsLoadingSubmissions(true);
     const targetContestId = contestId || "practice";
     try {
@@ -69,15 +87,21 @@ function ProblemPage() {
       const response = await axiosInstance.get(`/contests/${targetContestId}/submissions?problemId=${problemId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSubmissions(response.data);
-      const successfulSubmissions = response.data.filter(s => s.status === "Accepted");
+
+      const allSubs = response.data;
+      setSubmissions(allSubs);
+
+      const successfulSubmissions = allSubs.filter(s => s.status === "Accepted");
       setIsSolved(successfulSubmissions.length > 0);
 
-      // PERSISTENCE: If the user has already solved this in the current language, load their BEST code
-      const lastSuccessfulSolveForLanguage = successfulSubmissions.find(s => s.language === selectedLanguage);
+      // Persistence: Load the last accepted code for the current language if it exists
+      const lastSuccessfulSolveForLanguage = successfulSubmissions.find(s => s.language === (lang || selectedLanguage));
       if (lastSuccessfulSolveForLanguage) {
-        console.log(`[Persistence] Loading previous solution for ${selectedLanguage}`);
+        console.log(`[Persistence] Initial load: previous solution for ${lang || selectedLanguage}`);
         setCode(lastSuccessfulSolveForLanguage.code);
+      } else {
+        // Fallback to starter code if no solve found
+        setCode(PROBLEMS[problemId].starterCode[lang || selectedLanguage]);
       }
     } catch (e) {
       console.error("Failed to fetch submissions:", e);
@@ -149,42 +173,18 @@ function ProblemPage() {
     setIsRunning(true);
     setOutput(null);
 
+    // Now judge-powered for better precision
     const result = await executeCode(selectedLanguage, code, currentProblemId);
-
-    // Check constraints if execution was successful
-    if (result.success) {
-      if (result.runtime > currentProblem.timeLimit * 2) {
-        result.success = false;
-        result.error = `Time Limit Exceeded! (Total time: ${result.runtime}ms, Limit: ${currentProblem.timeLimit}ms)`;
-      } else if (result.memory && result.memory / 1024 / 1024 > currentProblem.memoryLimit) {
-        result.success = false;
-        const memoryMB = (result.memory / 1024 / 1024).toFixed(2);
-        result.error = `Memory Limit Exceeded! Your code used ${memoryMB}MB (Limit: ${currentProblem.memoryLimit}MB)`;
-      }
-    }
 
     setOutput(result);
     setIsRunning(false);
+    setIsConsoleOpen(true); // Automatically show console when run
+    setConsoleHeight(40);  // Give it some room
 
     if (result.success) {
-      const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
-      // CHECK ALL TEST CASES
-      const lines = result.output.trim().split("\n").filter(l => l.trim().length > 0);
-      const expectedLines = expectedOutput.trim().split("\n").filter(l => l.trim().length > 0);
-
-      // Lenient comparison: trim and ignore empty lines
-      const testsPassed = lines.length === expectedLines.length &&
-        lines.every((line, i) => line.trim() === expectedLines[i]?.trim());
-
-      const memoryMB = result.memory ? (result.memory / 1024 / 1024).toFixed(2) : "N/A";
-
-      if (testsPassed) {
-        toast.success(`Run Success! Output matches expected.`);
-      } else {
-        toast.error("Test failed. Check your output!");
-      }
+      toast.success(`Run Success! Output matches expected.`);
     } else {
-      toast.error(result.error || "Code execution failed!");
+      toast.error(result.status === "Runtime Error" ? "Execution Error" : (result.status || "Test failed"));
     }
   };
 
@@ -192,46 +192,26 @@ function ProblemPage() {
     setIsRunning(true);
     const targetContestId = contestId || "practice";
     try {
-      const runResult = await executeCode(selectedLanguage, code, currentProblemId);
+      // BACKEND JUDGING: Use isSubmit: true
+      const judgeResult = await executeCode(selectedLanguage, code, currentProblemId, true);
 
-      const expectedOutput = currentProblem?.expectedOutput?.[selectedLanguage];
-
-      if (!expectedOutput) {
-        console.warn(`[Judging] Missing expectedOutput for problem ${currentProblemId} in ${selectedLanguage}`);
-        // If we can't judge, we should probably just record it as "Pending" or fail gracefully
-        toast.error("Judging system error: Missing test data for this problem.");
+      // GUARD: If judging failed completely (e.g. problem not found, system error)
+      if (!judgeResult || judgeResult.status === "System Error" || !judgeResult.status) {
+        toast.error(judgeResult?.error || "Judging failed. Please try again.");
         setIsRunning(false);
         return;
       }
 
-      const isCorrect = checkIfTestsPassed(runResult.output, expectedOutput);
-      const status = isCorrect ? "Accepted" : "Wrong Answer";
-
-      // If it ran but had a runtime error
-      if (!runResult.success) {
-        await axiosInstance.post(`/contests/${targetContestId}/submit`, {
-          problemId: currentProblemId,
-          code,
-          language: selectedLanguage,
-          status: "Runtime Error",
-          runtime: runResult.runtime,
-          memory: runResult.memory || 0
-        }, {
-          headers: { Authorization: `Bearer ${await getToken()}` }
-        });
-        setOutput(runResult);
-        toast.error("Runtime Error in submission");
-        return;
-      }
-
-      // Submit the judged result
+      // If it ran but produced something (Accepted, Wrong Answer, etc)
+      // Save it to the DB via our existing contest route
       await axiosInstance.post(`/contests/${targetContestId}/submit`, {
         problemId: currentProblemId,
         code,
         language: selectedLanguage,
-        status,
-        runtime: runResult.runtime,
-        memory: runResult.memory || 0
+        status: judgeResult.status,
+        runtime: judgeResult.runtime || 0,
+        memory: judgeResult.memory || 0,
+        benchmarks: judgeResult.benchmarks // Store for detail view
       }, {
         headers: { Authorization: `Bearer ${await getToken()}` }
       });
@@ -239,9 +219,14 @@ function ProblemPage() {
       // Refetch history
       await fetchSubmissions(currentProblemId);
 
-      setOutput(runResult);
+      // Show the Detail View automatically
+      setSelectedSubmission({
+        ...judgeResult,
+        language: selectedLanguage,
+        code: code
+      });
 
-      if (isCorrect) {
+      if (judgeResult.status === "Accepted") {
         toast.success(isSolved ? "Changes saved successfully!" : "Solution Accepted!");
         if (!isSolved) triggerConfetti();
 
@@ -259,10 +244,10 @@ function ProblemPage() {
             if (!isAlreadyCompleted) {
               const streakToDisplay = typeof data.streak === 'number' ? data.streak : 1;
               setNewStreak(streakToDisplay);
-              setShowCompletionModal(true);
-              console.log(`[ProblemPage] Modal triggered with streak: ${streakToDisplay}`);
+              // setShowCompletionModal(true); // User requested to NOT show the modal
+              console.log(`[ProblemPage] Streak updated: ${streakToDisplay}`);
             } else {
-              console.log("[ProblemPage] Streak already completed today, skipping modal.");
+              console.log("[ProblemPage] Streak already completed today.");
             }
           },
           onError: (err) => {
@@ -310,6 +295,8 @@ function ProblemPage() {
               contestId={contestId}
               submissions={submissions}
               isLoadingSubmissions={isLoadingSubmissions}
+              selectedSubmission={selectedSubmission}
+              setSelectedSubmission={setSelectedSubmission}
             />
           </Panel>
 
@@ -317,30 +304,76 @@ function ProblemPage() {
 
           {/* right panel- code editor & output */}
           <Panel defaultSize={60} minSize={30}>
-            <PanelGroup direction="vertical">
-              {/* Top panel - Code editor */}
-              <Panel defaultSize={70} minSize={30}>
-                <CodeEditorPanel
-                  selectedLanguage={selectedLanguage}
-                  code={code}
-                  isRunning={isRunning}
-                  isSolved={isSolved}
-                  contestId={contestId}
-                  onLanguageChange={handleLanguageChange}
-                  onCodeChange={setCode}
-                  onRunCode={handleRunCode}
-                  onSubmit={handleSubmitCode}
-                />
-              </Panel>
+            <div className="h-full flex flex-col bg-base-300">
+              <div className="flex-1 min-h-0 relative">
+                <PanelGroup direction="vertical">
+                  {/* Top panel - Code editor */}
+                  <Panel defaultSize={70} minSize={30}>
+                    <CodeEditorPanel
+                      selectedLanguage={selectedLanguage}
+                      code={code}
+                      isRunning={isRunning}
+                      isSolved={isSolved}
+                      contestId={contestId}
+                      onLanguageChange={handleLanguageChange}
+                      onCodeChange={setCode}
+                      onRunCode={handleRunCode}
+                      onSubmit={handleSubmitCode}
+                    />
+                  </Panel>
 
-              <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
+                  {/* Bottom panel - Output Panel*/}
+                  {isConsoleOpen && (
+                    <>
+                      <PanelResizeHandle className="h-1 bg-base-200 hover:bg-primary/50 transition-colors cursor-row-resize" />
+                      <Panel
+                        defaultSize={consoleHeight}
+                        minSize={20}
+                        onResize={(size) => setConsoleHeight(size)}
+                      >
+                        <OutputPanel
+                          output={output}
+                          problem={currentProblem}
+                          selectedLanguage={selectedLanguage}
+                        />
+                      </Panel>
+                    </>
+                  )}
+                </PanelGroup>
+              </div>
 
-              {/* Bottom panel - Output Panel*/}
+              {/* Editor Footer with Console Toggle */}
+              <div className="flex items-center justify-between px-4 py-1.5 bg-base-300 border-t border-base-300 select-none">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsConsoleOpen(!isConsoleOpen)}
+                    className="btn btn-sm btn-ghost gap-2 font-bold normal-case hover:bg-base-200"
+                  >
+                    Console
+                    <div className={`transition-transform duration-300 ${isConsoleOpen ? 'rotate-180' : ''}`}>
+                      <ChevronUpIcon className="size-4" />
+                    </div>
+                  </button>
+                </div>
 
-              <Panel defaultSize={30} minSize={30}>
-                <OutputPanel output={output} />
-              </Panel>
-            </PanelGroup>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-ghost gap-2 font-black opacity-50 hover:opacity-100 normal-case"
+                    onClick={handleRunCode}
+                    disabled={isRunning}
+                  >
+                    Run
+                  </button>
+                  <button
+                    className="btn btn-sm btn-primary px-6 font-black normal-case"
+                    onClick={handleSubmitCode}
+                    disabled={isRunning}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
           </Panel>
         </PanelGroup>
       </div>

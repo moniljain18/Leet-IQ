@@ -6,9 +6,9 @@ RUN addgroup -S coderunner && adduser -S coderunner -G coderunner
 
 ENV NODE_OPTIONS="--max-old-space-size=256"
 
-COPY execute-js.sh /app/execute.sh
+COPY --chown=coderunner:coderunner execute-js.sh /app/execute.sh
 RUN chmod +x /app/execute.sh
 
 USER coderunner
 
-CMD ["/bin/sh"]
+ENTRYPOINT ["/app/execute.sh"]

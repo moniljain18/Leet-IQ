@@ -78,7 +78,7 @@ export const cancelRegistration = async (req, res) => {
 
 export const submitToContest = async (req, res) => {
     try {
-        const { problemId, code, language, status, runtime, memory } = req.body;
+        const { problemId, code, language, status, runtime, memory, benchmarks, notes } = req.body;
         const contestId = req.params.id;
         const userId = req.user._id;
 
@@ -118,7 +118,9 @@ export const submitToContest = async (req, res) => {
             status,
             runtime,
             memory: memory || 0,
-            score
+            score,
+            benchmarks, // NEW FIELD
+            notes // PERSISTENT NOTES
         });
 
         console.log(`[Submission] Saving for user: ${userId}, problem: ${problemId}, status: ${status}`);
@@ -259,6 +261,27 @@ export const getSolvedProblemIds = async (req, res) => {
         res.status(200).json(solvedSubmissions);
     } catch (error) {
         console.error("Error in getSolvedProblemIds:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+export const updateSubmissionNotes = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { notes } = req.body;
+        const userId = req.user._id;
+
+        const submission = await ContestSubmission.findOne({ _id: id, user: userId });
+        if (!submission) {
+            return res.status(404).json({ message: "Submission not found or unauthorized" });
+        }
+
+        submission.notes = notes;
+        await submission.save();
+
+        res.status(200).json({ message: "Notes updated successfully", notes });
+    } catch (error) {
+        console.error("Error in updateSubmissionNotes:", error);
         res.status(500).json({ message: "Server error" });
     }
 };

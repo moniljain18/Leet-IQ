@@ -111,19 +111,8 @@ function SessionPage() {
     setIsRunning(true);
     setOutput(null);
 
+    // Now judge-powered even for sessions
     const result = await executeCode(selectedLanguage, code, problemData.id);
-
-    // Check constraints if execution was successful
-    if (result.success && problemData) {
-      if (result.runtime > problemData.timeLimit) {
-        result.success = false;
-        result.error = `Time Limit Exceeded! Your code took ${result.runtime}ms (Limit: ${problemData.timeLimit}ms)`;
-      } else if (result.memory && result.memory / 1024 / 1024 > problemData.memoryLimit) {
-        result.success = false;
-        const memoryMB = (result.memory / 1024 / 1024).toFixed(2);
-        result.error = `Memory Limit Exceeded! Your code used ${memoryMB}MB (Limit: ${problemData.memoryLimit}MB)`;
-      }
-    }
 
     setOutput(result);
     setIsRunning(false);
