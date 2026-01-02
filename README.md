@@ -1,150 +1,166 @@
-# Leet IQ - Development Setup
+# 🚀 LeetIQ - AI-Powered Coding Interview Platform
 
-## 🚀 Quick Start
+LeetIQ is a modern, full-stack coding interview preparation platform that combines LeetCode-style problem solving with AI assistance, real-time collaboration, and comprehensive analytics.
 
-Start both frontend and backend servers with a single command:
+## ✨ Key Features
 
-```bash
-npm run dev
-```
+- **🎯 Problem Solving**: Extensive library of coding problems with multiple difficulty levels
+- **🤖 AI Hints**: Intelligent hints powered by Google's Gemini AI (3 hints per problem for premium users)
+- **⚡ Real-time Execution**: Run and test code with instant feedback using Docker containers
+- **🌐 Multi-language Support**: JavaScript, Python, Java, C++, and more
+- **🏢 Company Tags**: Filter problems by top tech companies (Google, Meta, Amazon, etc.)
+- **👥 Live Sessions**: Real-time collaborative coding with friends
+- **🏆 Contests**: Create and participate in timed coding contests
+- **📊 Analytics**: Comprehensive dashboard tracking your progress
+- **🔒 Proctoring**: AI-powered cheating detection for contests
+- **💎 Premium Features**: Unlimited access, video solutions, advanced analytics
 
-This will start:
-- **Backend API** on `http://localhost:3000`
-- **Frontend App** on `http://localhost:5173` (with API proxy to port 3000)
+## 🛠️ Tech Stack
+
+### Frontend
+- React 18 + Vite
+- TailwindCSS + DaisyUI
+- Clerk (Authentication)
+- Monaco Editor
+- Axios
+
+### Backend
+- Node.js + Express
+- MongoDB + Mongoose
+- Docker (Code execution)
+- Google Gemini API
+- Clerk webhooks
 
 ## 📋 Prerequisites
 
-- Node.js (v18 or higher)
-- MongoDB Atlas account
-- Clerk account (for authentication)
+- Node.js 18+
+- MongoDB (local or Atlas)
+- Docker
+- Clerk account
+- Google AI API key
 
-## 🔧 Installation
+## 🚀 Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd "Leet iq"
-   ```
+### 1. Clone & Install
+```bash
+git clone <repo-url>
+cd "Leet iq"
+npm install
+cd backend && npm install
+cd ../frontend && npm install
+```
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   cd backend && npm install
-   cd ../frontend && npm install
-   cd ..
-   ```
+### 2. Configure Environment
 
-3. **Configure environment variables**
+**Backend** (`backend/.env`):
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/leetiq
+CLERK_PUBLISHABLE_KEY=your_clerk_key
+CLERK_SECRET_KEY=your_clerk_secret
+GEMINI_API_KEY=your_google_ai_key
+NODE_ENV=development
+```
 
-   **Backend** (`backend/.env`):
-   ```bash
-   PORT=3000
-   DB_URL=your_mongodb_atlas_connection_string
-   NODE_ENV=development
-   CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   CLERK_SECRET_KEY=your_clerk_secret_key
-   CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
-   ```
+**Frontend** (`frontend/.env`):
+```env
+VITE_API_URL=http://localhost:5000
+VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key
+VITE_CLERK_PLAN_ID=your_plan_id
+VITE_PREMIUM_MONTHLY_PRICE=14.92
+VITE_PREMIUM_YEARLY_PRICE=99.99
+```
 
-   **Frontend** (`frontend/.env`):
-   ```bash
-   VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   VITE_API_URL=/api
-   VITE_STREAM_API_KEY=your_stream_key
-   ```
+### 3. Run Development Servers
 
-## 🎯 Available Scripts
-
-### Development
+From project root:
 ```bash
 npm run dev
 ```
-Runs both backend and frontend in development mode concurrently.
 
-### Build
+Or separately:
 ```bash
-npm run build
-```
-Installs dependencies and builds the frontend for production.
+# Terminal 1 - Backend
+cd backend && npm run dev
 
-### Start (Production)
-```bash
-npm start
+# Terminal 2 - Frontend  
+cd frontend && npm run dev
 ```
-Starts the backend server in production mode.
 
-## 🏗️ Project Structure
+Access at:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:5000
+
+## 📁 Project Structure
 
 ```
 Leet iq/
-├── backend/
-│   ├── src/
-│   │   ├── lib/
-│   │   │   ├── db.js          # MongoDB connection
-│   │   │   └── env.js         # Environment variables
-│   │   └── server.js          # Express server
-│   ├── .env                   # Backend environment variables
-│   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/
-│   │   ├── components/
-│   │   └── main.jsx
-│   ├── .env                   # Frontend environment variables
-│   ├── vite.config.js         # Vite configuration
-│   └── package.json
-└── package.json               # Root package.json with dev script
+│   │   ├── components/    # UI components
+│   │   ├── pages/        # Page components
+│   │   ├── hooks/        # Custom hooks
+│   │   ├── api/          # API clients
+│   │   └── lib/          # Utilities
+│   └── public/
+├── backend/
+│   ├── src/
+│   │   ├── models/       # MongoDB schemas
+│   │   ├── routes/       # API routes
+│   │   ├── controllers/  # Route handlers
+│   │   ├── middleware/   # Middleware
+│   │   └── lib/          # Utilities
+│   └── server.js
+└── README.md
 ```
 
-## 🔌 API Endpoints
+## 🎮 Usage
 
-All API endpoints are prefixed with `/api`:
+1. **Sign Up**: Create account via Clerk
+2. **Browse Problems**: Explore problem library
+3. **Start Coding**: Select and solve problems
+4. **Get Hints**: Use AI hints when stuck (premium)
+5. **Submit**: Test and submit solutions
+6. **Track Progress**: Monitor stats on dashboard
 
-- `GET /api/health` - Health check endpoint
-- `GET /api/books` - Example books endpoint
+## 🔧 Configuration
 
-## 🌐 How It Works
+### Clerk Setup
+1. Create app at [clerk.com](https://clerk.com)
+2. Enable email/password + OAuth
+3. Set up webhooks
+4. Configure billing plans (optional)
 
-1. **Backend** runs on port 3000 and handles all API requests
-2. **Frontend** runs on port 5173 (Vite default) and proxies `/api/*` requests to the backend
-3. In your browser, you access the frontend at `http://localhost:5173`
-4. All API calls from frontend to `/api/*` are automatically forwarded to `http://localhost:3000/api/*`
+### Google AI Setup
+1. Get API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Add to `backend/.env`
 
-## ✅ Verification
-
-After running `npm run dev`, verify everything is working:
-
-1. **Backend health check:**
-   ```bash
-   curl http://localhost:3000/api/health
-   ```
-   Should return: `{"msg":"Server is healthy","status":"success"}`
-
-2. **Frontend:** Open `http://localhost:5173` in your browser
-
-3. **API proxy:** From frontend, API calls to `/api/*` will work automatically
-
-## 📚 Additional Resources
-
-- [Clerk Setup Guide](./clerk-setup.md) - Complete Clerk authentication setup
-- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) - Database setup
-- [Vite Documentation](https://vitejs.dev/) - Frontend build tool
-
-## 🐛 Troubleshooting
-
-### Port already in use
-If port 3000 or 5173 is already in use, kill the process:
+### Docker Setup
+Ensure Docker is running:
 ```bash
-lsof -ti:3000 | xargs kill -9
-lsof -ti:5173 | xargs kill -9
+docker --version
 ```
 
-### MongoDB connection failed
-- Verify your MongoDB Atlas connection string in `backend/.env`
-- Ensure your IP is whitelisted in MongoDB Atlas
-- Check your database credentials
+## 🔒 Security
 
-### Clerk authentication not working
-- Verify Clerk keys in both `.env` files
-- Ensure keys match between frontend and backend
-- Check Clerk dashboard for application status
+- Input validation & sanitization
+- Rate limiting
+- Docker-isolated code execution
+- AI-based proctoring
+- Automated moderation
+
+## 📝 License
+
+MIT License
+
+## 🙏 Acknowledgments
+
+- Monaco Editor
+- Google Gemini
+- Clerk
+- Docker
+- Open-source community
+
+---
+
+Built with ❤️ by the LeetIQ Team
