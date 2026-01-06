@@ -64,7 +64,7 @@ app.get("/api/books", (req, res) => {
 });
 
 // Note: Frontend is deployed separately on Vercel
-// No static file serving needed here
+// No static file serving needed here/api
 
 // Start server and connect to database
 app.listen(env.PORT, () => {
