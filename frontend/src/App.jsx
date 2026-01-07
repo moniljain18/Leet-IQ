@@ -70,6 +70,9 @@ function App() {
 
         {/* Subscription Success - activates premium after checkout */}
         <Route path="/subscription/success" element={isSignedIn ? <SubscriptionSuccessPage /> : <Navigate to={"/"} />} />
+
+        {/* Catch-all route for 404 - redirect to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       <Toaster toastOptions={{ duration: 3000 }} />
