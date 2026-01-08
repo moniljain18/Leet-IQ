@@ -65,6 +65,32 @@ export const claimProblemReward = async (req, res) => {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+        // Check if this is a time travel solve
+        let isTimeTravel = false;
+        let timeTravelDate = null;
+
+        if (user.activeTimeTravelDate) {
+            isTimeTravel = true;
+            timeTravelDate = new Date(user.activeTimeTravelDate);
+
+            // Deduct a time travel pass
+            if (user.timeTravelPasses > 0) {
+                user.timeTravelPasses -= 1;
+                console.log(`[Reward] Time travel pass used. Remaining: ${user.timeTravelPasses}`);
+            }
+
+            // Add the date to streakHistory
+            if (!user.streakHistory) {
+                user.streakHistory = [];
+            }
+            user.streakHistory.push(timeTravelDate);
+
+            // Clear the active time travel
+            user.activeTimeTravelDate = null;
+
+            console.log(`[Reward] Time travel completed for date: ${timeTravelDate.toDateString()}`);
+        }
+
         const lastSolved = user.lastSolvedDate ? new Date(user.lastSolvedDate) : null;
         const lastSolvedDate = lastSolved ? new Date(lastSolved.getFullYear(), lastSolved.getMonth(), lastSolved.getDate()) : null;
 
@@ -72,39 +98,58 @@ export const claimProblemReward = async (req, res) => {
         const yesterday = new Date(today);
         yesterday.setDate(today.getDate() - 1);
 
-        console.log(`[Reward] Problem: ${problemId}, User: ${user.name}`);
+        console.log(`[Reward] Problem: ${problemId}, User: ${user.name}, IsTimeTravel: ${isTimeTravel}`);
         console.log(`[Reward] Debug Dates - Normalized Today: ${today.toISOString()}, Normalized Yesterday: ${yesterday.toISOString()}, Normalized LastSolved: ${lastSolvedDate ? lastSolvedDate.toISOString() : 'NULL'}`);
 
-        if (!lastSolvedDate) {
-            // First time ever solving a problem
-            user.streak = 1;
-            console.log("[Reward] First time solve - Streak set to 1");
-        } else {
-            const lastSolvedTime = lastSolvedDate.getTime();
-            const todayTime = today.getTime();
-            const yesterdayTime = yesterday.getTime();
-
-            if (lastSolvedTime === todayTime) {
-                // Already solved a problem today - streak stays the same
-                console.log(`[Reward] Already solved today - Streak remains at ${user.streak}`);
-            } else if (lastSolvedTime === yesterdayTime) {
-                // Solved yesterday, solving today - increment streak!
-                user.streak += 1;
-                console.log(`[Reward] Sequential solve - Streak incremented to ${user.streak}`);
-                // 7-day bonus
-                if (user.streak % 7 === 0) {
-                    coinGain += 50;
-                    console.log("[Reward] 7-day bonus granted (+50 coins)");
-                }
-            } else if (lastSolvedTime < yesterdayTime) {
-                // Solved before yesterday - streak broken, restart at 1
+        // Only update streak for non-time-travel solves
+        if (!isTimeTravel) {
+            if (!lastSolvedDate) {
+                // First time ever solving a problem
                 user.streak = 1;
-                console.log("[Reward] Streak broken - Restarting at 1");
+                console.log("[Reward] First time solve - Streak set to 1");
+            } else {
+                const lastSolvedTime = lastSolvedDate.getTime();
+                const todayTime = today.getTime();
+                const yesterdayTime = yesterday.getTime();
+
+                if (lastSolvedTime === todayTime) {
+                    // Already solved a problem today - streak stays the same
+                    console.log(`[Reward] Already solved today - Streak remains at ${user.streak}`);
+                } else if (lastSolvedTime === yesterdayTime) {
+                    // Solved yesterday, solving today - increment streak!
+                    user.streak += 1;
+                    console.log(`[Reward] Sequential solve - Streak incremented to ${user.streak}`);
+                    // 7-day bonus
+                    if (user.streak % 7 === 0) {
+                        coinGain += 50;
+                        console.log("[Reward] 7-day bonus granted (+50 coins)");
+                    }
+                } else if (lastSolvedTime < yesterdayTime) {
+                    // Solved before yesterday - streak broken, restart at 1
+                    user.streak = 1;
+                    console.log("[Reward] Streak broken - Restarting at 1");
+                }
+            }
+
+            // Update lastSolvedDate only for normal solves
+            user.lastSolvedDate = now;
+
+            // Add today to streakHistory
+            if (!user.streakHistory) {
+                user.streakHistory = [];
+            }
+            // Check if today is already in history
+            const todayInHistory = user.streakHistory.some(d => {
+                const historyDate = new Date(d);
+                const historyMidnight = new Date(historyDate.getFullYear(), historyDate.getMonth(), historyDate.getDate());
+                return historyMidnight.getTime() === today.getTime();
+            });
+            if (!todayInHistory) {
+                user.streakHistory.push(today);
             }
         }
 
         user.coins += coinGain;
-        user.lastSolvedDate = now;
 
         // Ensure problemId is saved as string (it is now a string array in model)
         if (!user.solvedProblems.includes(problemId)) {
@@ -116,13 +161,17 @@ export const claimProblemReward = async (req, res) => {
         console.log(`[Reward] Save successful - Final Streak: ${user.streak}, Final Coins: ${user.coins}`);
 
         res.status(200).json({
-            message: "Reward claimed",
+            message: isTimeTravel ? "Time travel completed!" : "Reward claimed",
             coins: user.coins,
             streak: user.streak,
-            coinGain
+            coinGain,
+            isTimeTravel,
+            timeTravelDate: isTimeTravel ? timeTravelDate : null,
+            passesRemaining: user.timeTravelPasses
         });
     } catch (error) {
         console.error("Error in claimProblemReward:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
+

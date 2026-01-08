@@ -100,6 +100,20 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        // Time Travel Passes for streak restoration
+        timeTravelPasses: {
+            type: Number,
+            default: 0,
+        },
+        // Track which dates user has solved problems on (for calendar dots)
+        streakHistory: [{
+            type: Date,
+        }],
+        // Currently active time travel date (pending completion)
+        activeTimeTravelDate: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true } // createdAt, updatedAt
 );

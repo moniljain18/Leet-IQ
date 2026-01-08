@@ -101,6 +101,14 @@ export const redeemProduct = async (req, res) => {
             premiumActivated = true;
         }
 
+        // Handle Time Travel Pass redemption
+        let timeTravelPassAdded = false;
+        if (product.name.toLowerCase().includes("time travel")) {
+            user.timeTravelPasses = (user.timeTravelPasses || 0) + 1;
+            timeTravelPassAdded = true;
+            console.log(`[Store] User ${user.name} purchased a Time Travel Pass. Total passes: ${user.timeTravelPasses}`);
+        }
+
         await user.save();
 
         // Update stock

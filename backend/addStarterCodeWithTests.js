@@ -1,8 +1,6 @@
 import mongoose from 'mongoose';
 import Problem from './src/models/Problem.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { env } from './src/lib/env.js';
 
 /**
  * Add starter code with console.log test cases for all problems
@@ -1547,7 +1545,7 @@ public:
 
 async function updateStarterCode() {
     try {
-        await mongoose.connect(process.env.DB_URL);
+        await mongoose.connect(env.DB_URL);
         console.log('✅ Connected to MongoDB\n');
 
         const problems = await Problem.find({ isActive: true });

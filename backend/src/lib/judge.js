@@ -274,17 +274,211 @@ run_judge()
 `;
 
         case "java":
-            // Java requires a more structured approach
+            // Java requires a complete class structure with main method
+            // We need to wrap user's Solution class and run test cases
+            const javaTestCases = JSON.stringify(testCases).replace(/"/g, '\\"');
+            const javaArgTypes = JSON.stringify(argTypes).replace(/"/g, '\\"');
             return `
 import java.util.*;
+import org.json.*;
+
+// Helper classes
+class ListNode {
+    int val;
+    ListNode next;
+    ListNode() {}
+    ListNode(int val) { this.val = val; }
+    ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+}
+
+class TreeNode {
+    int val;
+    TreeNode left;
+    TreeNode right;
+    TreeNode() {}
+    TreeNode(int val) { this.val = val; }
+    TreeNode(int val, TreeNode left, TreeNode right) {
+        this.val = val;
+        this.left = left;
+        this.right = right;
+    }
+}
 
 ${userCode}
 
-public class SolutionWrapper {
+public class Main {
+    // Helper methods
+    public static ListNode arrayToList(JSONArray arr) throws JSONException {
+        if (arr == null || arr.length() == 0) return null;
+        ListNode head = new ListNode(arr.getInt(0));
+        ListNode curr = head;
+        for (int i = 1; i < arr.length(); i++) {
+            curr.next = new ListNode(arr.getInt(i));
+            curr = curr.next;
+        }
+        return head;
+    }
+    
+    public static JSONArray listToArray(ListNode head) {
+        JSONArray arr = new JSONArray();
+        while (head != null) {
+            arr.put(head.val);
+            head = head.next;
+        }
+        return arr;
+    }
+    
+    public static TreeNode arrayToTree(JSONArray arr) throws JSONException {
+        if (arr == null || arr.length() == 0) return null;
+        TreeNode root = new TreeNode(arr.getInt(0));
+        Queue<TreeNode> queue = new LinkedList<>();
+        queue.add(root);
+        int i = 1;
+        while (i < arr.length()) {
+            TreeNode curr = queue.poll();
+            if (i < arr.length() && !arr.isNull(i)) {
+                curr.left = new TreeNode(arr.getInt(i));
+                queue.add(curr.left);
+            }
+            i++;
+            if (i < arr.length() && !arr.isNull(i)) {
+                curr.right = new TreeNode(arr.getInt(i));
+                queue.add(curr.right);
+            }
+            i++;
+        }
+        return root;
+    }
+    
     public static void main(String[] args) {
         String marker = "${marker}";
-        // Simplified Java execution for now
-        System.out.println(marker + "[]"); 
+        JSONArray results = new JSONArray();
+        
+        try {
+            String testCasesJson = "${javaTestCases}";
+            String argTypesJson = "${javaArgTypes}";
+            String returnType = "${returnType || ''}";
+            
+            JSONArray testCases = new JSONArray(testCasesJson);
+            JSONArray argTypes = new JSONArray(argTypesJson);
+            
+            Solution sol = new Solution();
+            
+            for (int t = 0; t < testCases.length(); t++) {
+                JSONObject tc = testCases.getJSONObject(t);
+                JSONObject result = new JSONObject();
+                
+                try {
+                    JSONArray params = tc.getJSONArray("params");
+                    long start = System.nanoTime();
+                    
+                    // Call the solution method using reflection
+                    java.lang.reflect.Method[] methods = Solution.class.getDeclaredMethods();
+                    java.lang.reflect.Method targetMethod = null;
+                    for (java.lang.reflect.Method m : methods) {
+                        if (m.getName().equals("${functionName}")) {
+                            targetMethod = m;
+                            break;
+                        }
+                    }
+                    
+                    if (targetMethod == null) {
+                        result.put("status", "Runtime Error");
+                        result.put("error", "Method ${functionName} not found");
+                        results.put(result);
+                        break;
+                    }
+                    
+                    // Prepare arguments
+                    Object[] callArgs = new Object[params.length()];
+                    Class<?>[] paramTypes = targetMethod.getParameterTypes();
+                    
+                    for (int i = 0; i < params.length(); i++) {
+                        String argType = i < argTypes.length() ? argTypes.getString(i) : "";
+                        Class<?> pType = paramTypes[i];
+                        
+                        if (argType.equals("ListNode") || pType == ListNode.class) {
+                            callArgs[i] = arrayToList(params.getJSONArray(i));
+                        } else if (argType.equals("TreeNode") || pType == TreeNode.class) {
+                            callArgs[i] = arrayToTree(params.getJSONArray(i));
+                        } else if (pType == int[].class) {
+                            JSONArray arr = params.getJSONArray(i);
+                            int[] intArr = new int[arr.length()];
+                            for (int j = 0; j < arr.length(); j++) intArr[j] = arr.getInt(j);
+                            callArgs[i] = intArr;
+                        } else if (pType == int.class || pType == Integer.class) {
+                            callArgs[i] = params.getInt(i);
+                        } else if (pType == String.class) {
+                            callArgs[i] = params.getString(i);
+                        } else if (pType == boolean.class || pType == Boolean.class) {
+                            callArgs[i] = params.getBoolean(i);
+                        } else if (pType == String[].class) {
+                            JSONArray arr = params.getJSONArray(i);
+                            String[] strArr = new String[arr.length()];
+                            for (int j = 0; j < arr.length(); j++) strArr[j] = arr.getString(j);
+                            callArgs[i] = strArr;
+                        } else if (pType == int[][].class) {
+                            JSONArray arr = params.getJSONArray(i);
+                            int[][] intArr = new int[arr.length()][];
+                            for (int j = 0; j < arr.length(); j++) {
+                                JSONArray inner = arr.getJSONArray(j);
+                                intArr[j] = new int[inner.length()];
+                                for (int k = 0; k < inner.length(); k++) intArr[j][k] = inner.getInt(k);
+                            }
+                            callArgs[i] = intArr;
+                        } else {
+                            callArgs[i] = params.get(i);
+                        }
+                    }
+                    
+                    Object actual = targetMethod.invoke(sol, callArgs);
+                    long end = System.nanoTime();
+                    
+                    // Serialize output
+                    Object serializedActual;
+                    if (returnType.equals("ListNode") || actual instanceof ListNode) {
+                        serializedActual = listToArray((ListNode) actual);
+                    } else if (actual instanceof int[]) {
+                        JSONArray arr = new JSONArray();
+                        for (int v : (int[]) actual) arr.put(v);
+                        serializedActual = arr;
+                    } else if (actual instanceof int[][]) {
+                        JSONArray arr = new JSONArray();
+                        for (int[] row : (int[][]) actual) {
+                            JSONArray rowArr = new JSONArray();
+                            for (int v : row) rowArr.put(v);
+                            arr.put(rowArr);
+                        }
+                        serializedActual = arr;
+                    } else if (actual instanceof List) {
+                        serializedActual = new JSONArray((List<?>) actual);
+                    } else {
+                        serializedActual = actual;
+                    }
+                    
+                    result.put("status", "Accepted");
+                    result.put("actual", serializedActual);
+                    result.put("expected", tc.get("expected"));
+                    result.put("time", (end - start) / 1_000_000.0);
+                    
+                } catch (Exception e) {
+                    result.put("status", "Runtime Error");
+                    result.put("error", e.getMessage() != null ? e.getMessage() : e.toString());
+                    results.put(result);
+                    break;
+                }
+                results.put(result);
+            }
+        } catch (Exception e) {
+            JSONObject errorResult = new JSONObject();
+            try {
+                errorResult.put("status", "Runtime Error");
+                errorResult.put("error", e.getMessage() != null ? e.getMessage() : e.toString());
+            } catch (JSONException je) {}
+            results.put(errorResult);
+        }
+        
+        System.out.println(marker + results.toString());
     }
 }
 `;

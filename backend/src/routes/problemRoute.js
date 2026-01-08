@@ -4,6 +4,26 @@ import Problem from "../models/Problem.js";
 const router = express.Router();
 
 /**
+ * Get company statistics (count of problems per company)
+ */
+router.get("/stats/companies", async (req, res) => {
+    try {
+        const result = await Problem.aggregate([
+            { $match: { isActive: true } },
+            { $unwind: "$companyTags" },
+            { $group: { _id: "$companyTags", count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ]);
+        res.status(200).json({
+            companies: result.map(r => ({ name: r._id, count: r.count }))
+        });
+    } catch (error) {
+        console.error("Error fetching company stats:", error);
+        res.status(500).json({ message: "Failed to fetch company statistics" });
+    }
+});
+
+/**
  * Get all problems (public endpoint)
  */
 router.get("/", async (req, res) => {

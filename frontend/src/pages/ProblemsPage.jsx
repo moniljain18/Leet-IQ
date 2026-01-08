@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import ProblemSidebar from "../components/ProblemSidebar";
 import {
   ChevronRightIcon, Code2Icon, CheckCircle2Icon, LockIcon,
   BuildingIcon, CrownIcon, SparklesIcon, SearchIcon, FilterIcon,
@@ -12,11 +13,13 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import { getAllProblemsPublic } from "../api/problems";
 import { usePremium } from "../hooks/usePremium";
+import { useProfile } from "../hooks/useAuth";
 
 function ProblemsPage() {
   const [solvedIds, setSolvedIds] = useState(new Set());
   const { getToken } = useAuth();
   const { isPremium, dailyProblemsRemaining, features } = usePremium();
+  const { data: profile } = useProfile();
   const [visibleCount, setVisibleCount] = useState(20);
 
   // Filter states
@@ -192,8 +195,8 @@ function ProblemsPage() {
                           key={status}
                           onClick={() => setStatusFilter(status)}
                           className={`btn btn-sm flex-1 capitalize ${statusFilter === status
-                              ? 'btn-primary'
-                              : 'btn-ghost bg-base-200'
+                            ? 'btn-primary'
+                            : 'btn-ghost bg-base-200'
                             }`}
                         >
                           {status === "all" ? "All" : status === "solved" ? "✓ Solved" : "○ Unsolved"}
@@ -211,11 +214,11 @@ function ProblemsPage() {
                           key={diff}
                           onClick={() => setDifficultyFilter(diff)}
                           className={`btn btn-sm flex-1 ${difficultyFilter === diff
-                              ? diff === "Easy" ? "btn-success"
-                                : diff === "Medium" ? "btn-warning"
-                                  : diff === "Hard" ? "btn-error"
-                                    : "btn-primary"
-                              : 'btn-ghost bg-base-200'
+                            ? diff === "Easy" ? "btn-success"
+                              : diff === "Medium" ? "btn-warning"
+                                : diff === "Hard" ? "btn-error"
+                                  : "btn-primary"
+                            : 'btn-ghost bg-base-200'
                             }`}
                         >
                           {diff === "all" ? "All" : diff}
@@ -404,6 +407,16 @@ function ProblemsPage() {
           </>
         )}
       </div>
+
+      {/* Fixed Sidebar - Floating on right edge */}
+      <ProblemSidebar
+        streak={profile?.streak || 0}
+        lastSolvedDate={profile?.lastSolvedDate}
+        coins={profile?.coins || 0}
+        timeTravelPasses={profile?.timeTravelPasses || 0}
+        streakHistory={profile?.streakHistory || []}
+        activeTimeTravelDate={profile?.activeTimeTravelDate}
+      />
     </div>
   );
 }
