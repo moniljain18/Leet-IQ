@@ -3,12 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllUsers, banUser, unbanUser, deleteUser } from "../../api/admin";
 import { SearchIcon, BanIcon, CheckCircleIcon, TrashIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import ConfirmModal from "../ConfirmModal";
 
 function UserManagement() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
     const [showBanModal, setShowBanModal] = useState(false);
     const [showUnbanModal, setShowUnbanModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [banReason, setBanReason] = useState("");
     const queryClient = useQueryClient();
@@ -50,6 +52,8 @@ function UserManagement() {
         onSuccess: () => {
             toast.success("User deleted successfully");
             queryClient.invalidateQueries(["adminUsers"]);
+            setShowDeleteModal(false);
+            setSelectedUser(null);
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || "Failed to delete user");
@@ -78,10 +82,13 @@ function UserManagement() {
         unbanMutation.mutate(selectedUser._id);
     };
 
-    const handleDelete = (userId) => {
-        if (window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-            deleteMutation.mutate(userId);
-        }
+    const handleDelete = (user) => {
+        setSelectedUser(user);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteMutation.mutate(selectedUser._id);
     };
 
     return (
@@ -167,8 +174,8 @@ function UserManagement() {
                                                         )}
                                                         <button
                                                             className="btn btn-error btn-xs"
-                                                            onClick={() => handleDelete(user._id)}
-                                                            disabled={deleteMutation.isLoading}
+                                                            onClick={() => handleDelete(user)}
+                                                            disabled={deleteMutation.isPending}
                                                             title="Delete user"
                                                         >
                                                             <TrashIcon className="size-3" />
@@ -298,6 +305,21 @@ function UserManagement() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setSelectedUser(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Delete User"
+                message={`Are you sure you want to delete ${selectedUser?.name}? This action cannot be undone.`}
+                confirmText="Delete User"
+                variant="error"
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 }

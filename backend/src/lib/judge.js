@@ -153,6 +153,9 @@ ${userCode}
 import time
 import json
 import sys
+from typing import List, Optional, Dict, Set, Tuple, Any
+from collections import defaultdict, Counter, deque
+import heapq
 
 # Helpers
 class ListNode:
@@ -205,9 +208,19 @@ def run_judge():
     return_type = "${returnType || ''}"
     
     exec_globals = {}
-    # Inject helpers into user scope
+    # Inject helpers and common imports into user scope
     exec_globals['ListNode'] = ListNode
     exec_globals['TreeNode'] = TreeNode
+    exec_globals['List'] = List
+    exec_globals['Optional'] = Optional
+    exec_globals['Dict'] = Dict
+    exec_globals['Set'] = Set
+    exec_globals['Tuple'] = Tuple
+    exec_globals['Any'] = Any
+    exec_globals['defaultdict'] = defaultdict
+    exec_globals['Counter'] = Counter
+    exec_globals['deque'] = deque
+    exec_globals['heapq'] = heapq
 
     try:
         exec(compile("""${escapedCode}\""", 'user_code', 'exec'), exec_globals)
@@ -566,13 +579,34 @@ export async function judgeCode(language, userCode, functionName, testCases, lim
         let finalStatus = "Accepted";
         let firstFailure = null;
 
+        // Smart comparison function that handles unordered arrays
+        const deepEqual = (a, b) => {
+            // If both are arrays, try sorted comparison for order-insensitive matching
+            if (Array.isArray(a) && Array.isArray(b)) {
+                if (a.length !== b.length) return false;
+
+                // For nested arrays (like List<List<String>>), sort inner arrays first, then outer
+                const normalize = (arr) => {
+                    if (arr.length === 0) return arr;
+                    if (Array.isArray(arr[0])) {
+                        // Sort each inner array, then sort the outer array
+                        return arr.map(inner => [...inner].sort()).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)));
+                    }
+                    return [...arr].sort();
+                };
+
+                return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+            }
+            return JSON.stringify(a) === JSON.stringify(b);
+        };
+
         for (const c of cases) {
             if (c.status !== "Accepted") {
                 finalStatus = c.status;
                 firstFailure = c;
                 break;
             }
-            if (JSON.stringify(c.actual) !== JSON.stringify(c.expected)) {
+            if (!deepEqual(c.actual, c.expected)) {
                 finalStatus = "Wrong Answer";
                 firstFailure = c;
                 break;

@@ -3,10 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllContests, createContest, updateContest, deleteContest, getAllProblems } from "../../api/admin";
 import { PlusIcon, EditIcon, TrashIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import ConfirmModal from "../ConfirmModal";
 
 function ContestManagement() {
     const [showModal, setShowModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingContest, setEditingContest] = useState(null);
+    const [selectedContest, setSelectedContest] = useState(null);
     const [selectedProblems, setSelectedProblems] = useState([]);
     const queryClient = useQueryClient();
 
@@ -54,6 +57,8 @@ function ContestManagement() {
         onSuccess: () => {
             toast.success("Contest deleted successfully");
             queryClient.invalidateQueries(["adminContests"]);
+            setShowDeleteModal(false);
+            setSelectedContest(null);
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || "Failed to delete contest");
@@ -110,10 +115,13 @@ function ContestManagement() {
         setShowModal(true);
     };
 
-    const handleDelete = (contestId) => {
-        if (window.confirm("Are you sure you want to delete this contest? All submissions will also be deleted.")) {
-            deleteMutation.mutate(contestId);
-        }
+    const handleDelete = (contest) => {
+        setSelectedContest(contest);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteMutation.mutate(selectedContest._id);
     };
 
     const toggleProblem = (problemId) => {
@@ -185,8 +193,8 @@ function ContestManagement() {
                                             </button>
                                             <button
                                                 className="btn btn-error btn-xs"
-                                                onClick={() => handleDelete(contest._id)}
-                                                disabled={deleteMutation.isLoading}
+                                                onClick={() => handleDelete(contest)}
+                                                disabled={deleteMutation.isPending}
                                             >
                                                 <TrashIcon className="size-3" />
                                             </button>
@@ -347,6 +355,21 @@ function ContestManagement() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Contest Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setSelectedContest(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Contest"
+                message={`Are you sure you want to delete "${selectedContest?.name}"? All submissions will also be deleted.`}
+                confirmText="Delete Contest"
+                variant="error"
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 }

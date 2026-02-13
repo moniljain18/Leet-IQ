@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllSessions, deleteSession } from "../../api/admin";
 import { TrashIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import ConfirmModal from "../ConfirmModal";
 
 function SessionManagement() {
     const queryClient = useQueryClient();
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [selectedSession, setSelectedSession] = useState(null);
 
     const { data, isLoading } = useQuery({
         queryKey: ["adminSessions"],
@@ -16,16 +20,21 @@ function SessionManagement() {
         onSuccess: () => {
             toast.success("Session terminated successfully");
             queryClient.invalidateQueries(["adminSessions"]);
+            setShowDeleteModal(false);
+            setSelectedSession(null);
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || "Failed to terminate session");
         },
     });
 
-    const handleDelete = (sessionId) => {
-        if (window.confirm("Are you sure you want to terminate this session?")) {
-            deleteMutation.mutate(sessionId);
-        }
+    const handleDelete = (session) => {
+        setSelectedSession(session);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteMutation.mutate(selectedSession._id);
     };
 
     return (
@@ -103,8 +112,8 @@ function SessionManagement() {
                                     <td>
                                         <button
                                             className="btn btn-error btn-sm"
-                                            onClick={() => handleDelete(session._id)}
-                                            disabled={deleteMutation.isLoading}
+                                            onClick={() => handleDelete(session)}
+                                            disabled={deleteMutation.isPending}
                                         >
                                             <TrashIcon className="size-4" />
                                             Terminate
@@ -116,8 +125,24 @@ function SessionManagement() {
                     </table>
                 </div>
             )}
+
+            {/* Terminate Session Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setSelectedSession(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Terminate Session"
+                message={`Are you sure you want to terminate the session between ${selectedSession?.host?.name || 'host'} and ${selectedSession?.participant?.name || 'participant'}?`}
+                confirmText="Terminate"
+                variant="error"
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 }
 
 export default SessionManagement;
+

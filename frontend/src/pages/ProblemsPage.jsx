@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ProblemSidebar from "../components/ProblemSidebar";
 import {
@@ -23,12 +23,22 @@ function ProblemsPage() {
   const [visibleCount, setVisibleCount] = useState(20);
 
   // Filter states
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, solved, unsolved
   const [difficultyFilter, setDifficultyFilter] = useState("all"); // all, Easy, Medium, Hard
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState(""); // company name from URL
   const [showFilters, setShowFilters] = useState(false);
   const filterRef = useRef(null);
+
+  // Read company filter from URL params
+  useEffect(() => {
+    const companyParam = searchParams.get("company");
+    if (companyParam) {
+      setCompanyFilter(companyParam);
+    }
+  }, [searchParams]);
 
   // Fetch problems from backend
   const { data: problemsData, isLoading: problemsLoading } = useQuery({
@@ -87,15 +97,24 @@ function ProblemsPage() {
       if (difficultyFilter !== "all" && p.difficulty !== difficultyFilter) return false;
       // Category filter
       if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      // Company filter - check if problem's companyTags contains the selected company
+      if (companyFilter) {
+        const tags = p.companyTags || [];
+        const hasCompany = tags.some(tag =>
+          tag.toLowerCase() === companyFilter.toLowerCase()
+        );
+        if (!hasCompany) return false;
+      }
       return true;
     });
-  }, [problems, searchQuery, statusFilter, difficultyFilter, categoryFilter, solvedIds]);
+  }, [problems, searchQuery, statusFilter, difficultyFilter, categoryFilter, companyFilter, solvedIds]);
 
   // Count active filters
   const activeFilterCount = [
     statusFilter !== "all",
     difficultyFilter !== "all",
-    categoryFilter !== "all"
+    categoryFilter !== "all",
+    companyFilter !== ""
   ].filter(Boolean).length;
 
   // Reset all filters
@@ -104,6 +123,8 @@ function ProblemsPage() {
     setStatusFilter("all");
     setDifficultyFilter("all");
     setCategoryFilter("all");
+    setCompanyFilter("");
+    setSearchParams({}); // Clear URL params
   };
 
   const easyProblemsCount = problems.filter((p) => p.difficulty === "Easy").length;
@@ -126,6 +147,28 @@ function ProblemsPage() {
             Sharpen your coding skills with these curated problems
           </p>
         </div>
+
+        {/* Company Filter Badge - Shows when filtering by company */}
+        {companyFilter && (
+          <div className="mb-6 flex items-center gap-3">
+            <div className="badge badge-lg badge-primary gap-2 py-3 px-4">
+              <BuildingIcon className="size-4" />
+              <span>Showing problems from: <strong>{companyFilter}</strong></span>
+              <button
+                onClick={() => {
+                  setCompanyFilter("");
+                  setSearchParams({});
+                }}
+                className="btn btn-xs btn-ghost btn-circle"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </div>
+            <span className="text-sm text-base-content/60">
+              {filteredProblems.length} problem{filteredProblems.length !== 1 ? 's' : ''} found
+            </span>
+          </div>
+        )}
 
         {/* Daily Problem Limit Banner - Free Users Only */}
         {!isPremium && (

@@ -28,10 +28,19 @@ console.log("Test 3:", containsDuplicate([1,1,1,3,3,4,3,2,4,2])); // Expected: t
 print("Test 1:", containsDuplicate([1,2,3,1]))  # Expected: True
 print("Test 2:", containsDuplicate([1,2,3,4]))  # Expected: False
 print("Test 3:", containsDuplicate([1,1,1,3,3,4,3,2,4,2]))  # Expected: True`,
-        java: `class Solution {
+        java: `import java.util.*;
+
+class Solution {
     public boolean containsDuplicate(int[] nums) {
         // Your code here
-        
+        return false;
+    }
+    
+    public static void main(String[] args) {
+        Solution sol = new Solution();
+        System.out.println("Test 1: " + sol.containsDuplicate(new int[]{1,2,3,1})); // Expected: true
+        System.out.println("Test 2: " + sol.containsDuplicate(new int[]{1,2,3,4})); // Expected: false
+        System.out.println("Test 3: " + sol.containsDuplicate(new int[]{1,1,1,3,3,4,3,2,4,2})); // Expected: true
     }
 }`,
         cpp: `class Solution {

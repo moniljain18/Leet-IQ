@@ -7,7 +7,7 @@ import { executeCode } from "../api/executor";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { CheckIcon, CopyIcon, Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, Loader2Icon, LogOutIcon, PhoneOffIcon, AlertTriangleIcon } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 
@@ -23,6 +23,7 @@ function SessionPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [showEndModal, setShowEndModal] = useState(false);
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
@@ -66,12 +67,15 @@ function SessionPage() {
     joinSessionMutation.mutate(id, { onSuccess: refetch });
   }, [session, user, loadingSession, isHost, isParticipant, id]);
 
-  // redirect the "participant" when session ends
+  // Force redirect when session ends
   useEffect(() => {
     if (!session || loadingSession) return;
 
-    if (session.status === "completed") navigate("/dashboard");
-  }, [session, loadingSession, navigate]);
+    if (session.status === "completed") {
+      // Force redirect to dashboard immediately
+      window.location.href = "/dashboard";
+    }
+  }, [session, loadingSession]);
 
   if (loadingSession) {
     return (
@@ -119,29 +123,49 @@ function SessionPage() {
   };
 
   const handleLeave = () => {
-    console.log("handleLeave called", { isParticipant, sessionId: id, user: user?.id });
+    console.log("handleLeave called", { isParticipant, isHost, sessionId: id, user: user?.id });
+
     if (isParticipant) {
-      console.log("Calling leaveSession API");
+      // Participant leaves the session
+      console.log("Participant leaving - calling leaveSession API");
       leaveSessionMutation.mutate(id, {
-        onSuccess: (data) => {
-          console.log("leaveSession success", data);
-          navigate("/dashboard");
+        onSuccess: () => {
+          console.log("leaveSession success - force redirecting");
+          window.location.href = "/dashboard";
         },
         onError: (error) => {
           console.error("leaveSession error", error);
+          window.location.href = "/dashboard";
         }
       });
       return;
     }
-    console.log("Host leaving - just navigating");
-    navigate("/dashboard");
+
+    if (isHost) {
+      // Show end session confirmation modal
+      setShowEndModal(true);
+      return;
+    }
+
+    // Fallback - force redirect
+    window.location.href = "/dashboard";
+  };
+
+  const confirmEndSession = () => {
+    console.log("Host confirming end session");
+    endSessionMutation.mutate(id, {
+      onSuccess: () => {
+        console.log("Session ended - force redirecting");
+        window.location.href = "/dashboard";
+      },
+      onError: () => {
+        window.location.href = "/dashboard";
+      }
+    });
   };
 
   const handleEndSession = () => {
-    if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
-      // this will navigate the HOST to dashboard
-      endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
-    }
+    setShowEndModal(true);
   };
 
   const copyInviteLink = () => {
@@ -347,7 +371,11 @@ function SessionPage() {
                   <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
 
                   <Panel defaultSize={30} minSize={15}>
-                    <OutputPanel output={output} />
+                    <OutputPanel
+                      output={output}
+                      problem={problemData}
+                      selectedLanguage={selectedLanguage}
+                    />
                   </Panel>
                 </PanelGroup>
               </Panel>
@@ -379,6 +407,44 @@ function SessionPage() {
           </Panel>
         </PanelGroup>
       </div>
+
+      {/* End Session Confirmation Modal */}
+      {showEndModal && (
+        <div className="modal modal-open">
+          <div className="modal-box border border-error/30 bg-base-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-error/20 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangleIcon className="w-8 h-8 text-error" />
+              </div>
+              <h3 className="font-bold text-xl mb-2">End Session?</h3>
+              <p className="text-base-content/70 mb-6">
+                Are you sure you want to end this session? All participants will be disconnected and redirected.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowEndModal(false)}
+                  className="btn btn-ghost flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmEndSession}
+                  disabled={endSessionMutation.isPending}
+                  className="btn btn-error flex-1 gap-2"
+                >
+                  {endSessionMutation.isPending ? (
+                    <Loader2Icon className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <PhoneOffIcon className="w-4 h-4" />
+                  )}
+                  End Session
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop bg-black/50" onClick={() => setShowEndModal(false)}></div>
+        </div>
+      )}
     </div>
   );
 }

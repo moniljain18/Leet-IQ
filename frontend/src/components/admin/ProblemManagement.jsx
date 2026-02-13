@@ -3,10 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllProblems, createProblem, updateProblem, deleteProblem } from "../../api/admin";
 import { PlusIcon, EditIcon, TrashIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import ConfirmModal from "../ConfirmModal";
 
 function ProblemManagement() {
     const [showModal, setShowModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingProblem, setEditingProblem] = useState(null);
+    const [selectedProblem, setSelectedProblem] = useState(null);
     const queryClient = useQueryClient();
 
     const { data, isLoading } = useQuery({
@@ -48,6 +51,8 @@ function ProblemManagement() {
             toast.success("Problem deleted successfully");
             queryClient.invalidateQueries(["adminProblems"]);
             queryClient.invalidateQueries(["problems"]);
+            setShowDeleteModal(false);
+            setSelectedProblem(null);
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || "Failed to delete problem");
@@ -103,10 +108,13 @@ function ProblemManagement() {
         setShowModal(true);
     };
 
-    const handleDelete = (problemId) => {
-        if (window.confirm("Are you sure you want to delete this problem?")) {
-            deleteMutation.mutate(problemId);
-        }
+    const handleDelete = (problem) => {
+        setSelectedProblem(problem);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteMutation.mutate(selectedProblem.id);
     };
 
     return (
@@ -149,8 +157,8 @@ function ProblemManagement() {
                                     <td className="font-semibold">{problem.title}</td>
                                     <td>
                                         <span className={`badge ${problem.difficulty === 'Easy' ? 'badge-success' :
-                                                problem.difficulty === 'Medium' ? 'badge-warning' :
-                                                    'badge-error'
+                                            problem.difficulty === 'Medium' ? 'badge-warning' :
+                                                'badge-error'
                                             }`}>
                                             {problem.difficulty}
                                         </span>
@@ -167,8 +175,8 @@ function ProblemManagement() {
                                             </button>
                                             <button
                                                 className="btn btn-error btn-xs"
-                                                onClick={() => handleDelete(problem.id)}
-                                                disabled={deleteMutation.isLoading}
+                                                onClick={() => handleDelete(problem)}
+                                                disabled={deleteMutation.isPending}
                                             >
                                                 <TrashIcon className="size-3" />
                                             </button>
@@ -429,6 +437,21 @@ function ProblemManagement() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Problem Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setSelectedProblem(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Problem"
+                message={`Are you sure you want to delete "${selectedProblem?.title}"? This cannot be undone.`}
+                confirmText="Delete Problem"
+                variant="error"
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 }

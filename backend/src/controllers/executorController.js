@@ -82,10 +82,18 @@ export const executeSubmission = async (req, res) => {
 
         const testCasesToRun = isSubmit ? problem.testCases : problem.testCases.slice(0, 3);
 
+        // Java needs more time due to JVM startup overhead
+        const languageTimeLimits = {
+            java: 10000,  // 10 seconds for Java
+            python: 5000, // 5 seconds for Python
+            javascript: 2000
+        };
+        const timeLimit = languageTimeLimits[language.toLowerCase()] || problem.timeLimit || 5000;
+
         console.log(`[Executor] ${isSubmit ? 'Judging' : 'Running'} ${problemId} in ${language} `);
         const result = await judgeCode(language, code, problem.functionName, testCasesToRun, {
-            timeLimit: problem.timeLimit || 2000,
-            memoryLimit: problem.memoryLimit || 128,
+            timeLimit: timeLimit,
+            memoryLimit: problem.memoryLimit || 256,
             structure: problem.structure // Pass structure for type conversion (ListNode, etc)
         });
 

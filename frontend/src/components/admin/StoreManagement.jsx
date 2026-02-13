@@ -18,6 +18,7 @@ import {
     ShoppingBagIcon,
     GiftIcon
 } from "lucide-react";
+import ConfirmModal from "../ConfirmModal";
 
 function StoreManagement() {
     const { getToken } = useAuth();
@@ -35,6 +36,10 @@ function StoreManagement() {
         isFeatured: false,
         premiumDays: null
     });
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showCancelOrderModal, setShowCancelOrderModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [selectedOrder, setSelectedOrder] = useState(null);
 
     // Fetch products
     const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -107,6 +112,8 @@ function StoreManagement() {
         onSuccess: () => {
             toast.success("Product deleted!");
             queryClient.invalidateQueries(["admin-store-products"]);
+            setShowDeleteModal(false);
+            setSelectedProduct(null);
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || "Failed to delete product");
@@ -167,6 +174,26 @@ function StoreManagement() {
         } else {
             createProductMutation.mutate(productForm);
         }
+    };
+
+    const handleDeleteProduct = (product) => {
+        setSelectedProduct(product);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteProductMutation.mutate(selectedProduct._id);
+    };
+
+    const handleCancelOrder = (order) => {
+        setSelectedOrder(order);
+        setShowCancelOrderModal(true);
+    };
+
+    const handleCancelOrderConfirm = () => {
+        updateOrderMutation.mutate({ id: selectedOrder._id, status: "cancelled" });
+        setShowCancelOrderModal(false);
+        setSelectedOrder(null);
     };
 
     const getCategoryIcon = (category) => {
@@ -282,12 +309,9 @@ function StoreManagement() {
                                                         <EditIcon className="size-4" />
                                                     </button>
                                                     <button
-                                                        onClick={() => {
-                                                            if (confirm("Delete this product?")) {
-                                                                deleteProductMutation.mutate(product._id);
-                                                            }
-                                                        }}
+                                                        onClick={() => handleDeleteProduct(product)}
                                                         className="btn btn-ghost btn-xs text-error"
+                                                        disabled={deleteProductMutation.isPending}
                                                     >
                                                         <TrashIcon className="size-4" />
                                                     </button>
@@ -377,11 +401,7 @@ function StoreManagement() {
                                             )}
                                             {!["delivered", "completed", "cancelled"].includes(order.status) && (
                                                 <button
-                                                    onClick={() => {
-                                                        if (confirm("Cancel this order?")) {
-                                                            updateOrderMutation.mutate({ id: order._id, status: "cancelled" });
-                                                        }
-                                                    }}
+                                                    onClick={() => handleCancelOrder(order)}
                                                     className="btn btn-ghost btn-sm text-error"
                                                 >
                                                     <XCircleIcon className="size-4" />
@@ -525,6 +545,36 @@ function StoreManagement() {
                     <div className="modal-backdrop bg-black/50" onClick={resetForm} />
                 </div>
             )}
+
+            {/* Delete Product Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    setShowDeleteModal(false);
+                    setSelectedProduct(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Product"
+                message={`Are you sure you want to delete "${selectedProduct?.name}"?`}
+                confirmText="Delete"
+                variant="error"
+                isLoading={deleteProductMutation.isPending}
+            />
+
+            {/* Cancel Order Confirmation Modal */}
+            <ConfirmModal
+                isOpen={showCancelOrderModal}
+                onClose={() => {
+                    setShowCancelOrderModal(false);
+                    setSelectedOrder(null);
+                }}
+                onConfirm={handleCancelOrderConfirm}
+                title="Cancel Order"
+                message={`Are you sure you want to cancel the order for "${selectedOrder?.productName}"? The customer's coins will NOT be refunded.`}
+                confirmText="Cancel Order"
+                variant="warning"
+                isLoading={updateOrderMutation.isPending}
+            />
         </div>
     );
 }

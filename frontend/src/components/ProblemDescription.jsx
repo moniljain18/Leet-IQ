@@ -363,15 +363,13 @@ function ProblemDescription({
                     type="checkbox"
                     checked={expandedSections.companies || false}
                     onChange={() => toggleSection('companies')}
-                    disabled={!isPremium}
                   />
                   <div className="collapse-title flex items-center gap-2 font-medium">
-                    {!isPremium && <LockIcon className="size-4 text-amber-500" />}
-                    {isPremium && <BuildingIcon className="size-4 text-amber-500" />}
-                    <span className={!isPremium ? "text-amber-500" : ""}>Companies</span>
+                    <BuildingIcon className="size-4 text-amber-500" />
+                    <span>Companies</span>
                     {!isPremium && (
                       <span className="badge badge-warning badge-sm gap-1 ml-auto mr-6">
-                        <CrownIcon className="size-3" /> Premium
+                        <LockIcon className="size-3" />
                       </span>
                     )}
                   </div>
@@ -388,10 +386,37 @@ function ProblemDescription({
                       )
                     ) : (
                       <div className="pt-2">
-                        <Link to="/premium" className="btn btn-warning btn-sm gap-2">
-                          <LockIcon className="size-3" />
-                          Upgrade to Premium
-                        </Link>
+                        <div className="relative min-h-[140px] bg-base-300/30 rounded-xl overflow-hidden">
+                          {/* Blurred placeholder content */}
+                          <div className="blur-sm pointer-events-none select-none opacity-40 p-4">
+                            <div className="flex flex-wrap gap-2">
+                              <span className="badge badge-ghost">Google</span>
+                              <span className="badge badge-ghost">Amazon</span>
+                              <span className="badge badge-ghost">Meta</span>
+                              <span className="badge badge-ghost">Microsoft</span>
+                            </div>
+                          </div>
+                          {/* Lock Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-base-100/70 backdrop-blur-sm">
+                            <div className="text-center">
+                              <div className="flex justify-center mb-2">
+                                <div className="relative">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl flex items-center justify-center">
+                                    <LockIcon className="size-5 text-primary" />
+                                  </div>
+                                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <CrownIcon className="size-2 text-white" />
+                                  </div>
+                                </div>
+                              </div>
+                              <p className="text-xs text-base-content/60 mb-2">Unlock company tags</p>
+                              <Link to="/premium" className="btn btn-primary btn-sm gap-2">
+                                <CrownIcon className="size-4" />
+                                Upgrade to Premium
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -404,15 +429,13 @@ function ProblemDescription({
                       type="checkbox"
                       checked={expandedSections[`hint${hintNum}`] || false}
                       onChange={() => toggleSection(`hint${hintNum}`)}
-                      disabled={!isPremium}
                     />
                     <div className="collapse-title flex items-center gap-2 font-medium">
-                      {!isPremium && <LockIcon className="size-4 text-amber-500" />}
-                      {isPremium && <LightbulbIcon className="size-4 text-info" />}
-                      <span className={!isPremium ? "text-amber-500" : ""}>Hint {hintNum}</span>
+                      <LightbulbIcon className="size-4 text-info" />
+                      <span>Hint {hintNum}</span>
                       {!isPremium && (
                         <span className="badge badge-warning badge-sm gap-1 ml-auto mr-6">
-                          <CrownIcon className="size-3" /> Premium
+                          <LockIcon className="size-3" />
                         </span>
                       )}
                     </div>
@@ -425,10 +448,32 @@ function ProblemDescription({
                         )
                       ) : (
                         <div className="pt-2">
-                          <Link to="/premium" className="btn btn-warning btn-sm gap-2">
-                            <LockIcon className="size-3" />
-                            Upgrade to Premium
-                          </Link>
+                          <div className="relative min-h-[140px] bg-base-300/30 rounded-xl overflow-hidden">
+                            {/* Blurred placeholder content */}
+                            <div className="blur-sm pointer-events-none select-none opacity-40 p-4">
+                              <p className="text-sm text-base-content/80">This hint will help you approach the problem by suggesting a specific data structure or algorithm...</p>
+                            </div>
+                            {/* Lock Overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-base-100/70 backdrop-blur-sm">
+                              <div className="text-center">
+                                <div className="flex justify-center mb-2">
+                                  <div className="relative">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl flex items-center justify-center">
+                                      <LockIcon className="size-5 text-primary" />
+                                    </div>
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                                      <CrownIcon className="size-2 text-white" />
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-base-content/60 mb-2">Unlock hints</p>
+                                <Link to="/premium" className="btn btn-primary btn-sm gap-2">
+                                  <CrownIcon className="size-4" />
+                                  Upgrade to Premium
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
